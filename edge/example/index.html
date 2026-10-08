@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>55GMS ads test page</title>
+    <style>
+      body { font: 15px/1.5 system-ui, sans-serif; max-width: 1000px; margin: 32px auto; padding: 0 16px; }
+      section { margin: 32px 0; }
+      .narrow { max-width: 340px; }
+      .spacer { height: 900px; border-left: 2px dashed #ccc; margin: 24px 0; padding-left: 12px; color: #888; }
+    </style>
+    <!-- Locally the script is served by the example server. In production use the pinned jsDelivr URL with SRI. -->
+    <script async src="/ads.min.js"></script>
+  </head>
+  <body>
+    <h1>55GMS ads test page</h1>
+    <section>
+      <h2>Auto size, full width</h2>
+      <div data-55gms-ad></div>
+    </section>
+    <section>
+      <h2>Fixed 300×250</h2>
+      <div data-55gms-ad data-size="300x250"></div>
+    </section>
+    <section class="narrow">
+      <h2>Auto size, narrow column</h2>
+      <div data-55gms-ad></div>
+    </section>
+    <div class="spacer">Scroll down. The slot below counts only once it is half visible for one second.</div>
+    <section>
+      <h2>Below the fold</h2>
+      <div data-55gms-ad data-size="728x90"></div>
+    </section>
+  </body>
+</html>
