@@ -21,13 +21,12 @@ Browsers never talk to the ad server, except to load uploaded images from `/medi
 
 ## Status
 
-Read this before relying on the project.
-
-- **Not yet run against a database.** The server code, the SQL migration, and every query were written without a Postgres to run them on (this machine has no Docker or Postgres). Lint, the SPA build, the embed build, and the routes that need no database were run. Expect to fix small SQL mistakes on the first real start.
-- **A development database exists but is not reachable from a laptop.** `gms-ads-dev-db` (Postgres 17) was created in Coolify, project *55GMS*, environment *ads-development*, on *US Chicago*. It is private. To use it from your machine, enable "Make it publicly available" on it in Coolify (or tunnel over SSH), then put its URL in `.env.local` as `DATABASE_URL` with `PGSSLMODE=disable` unless you enabled SSL.
-- **No automated tests.** The brief asked for a `node --test` suite; that was dropped on request, so there is no `npm test`. The edge module was exercised by hand against a fake ad server (serve, dedupe, forged IDs, bot filtering, local cap, outage spool, crash recovery, in-order resend).
-- **The dashboard has not been viewed in a browser.** It builds and lints; layout and motion have not been checked visually.
-- **Nothing has been pushed or tagged.** jsDelivr cannot serve `ads.js` until a version tag is pushed (see "Releasing ads.js").
+- **Production runs at https://ads.ch3n.cc** on Coolify (project *55GMS*, environment *production*, application `gms-ads`, database `gms-ads-db`, media volume at `/data/media`).
+- **`ads.js` 1.0.0 is tagged (`v1.0.0`) and served by jsDelivr**; the published file matches the SRI hash in `embed/dist/manifest.json`.
+- **The API was exercised end to end against a real Postgres**: migration, creative upload and resize, media caching and WebP negotiation, manifest and 304, gzip batch ingestion, idempotent replay, rejected batches, stats queries, CSV export, roles, CSRF, and refresh-token rotation with reuse detection. The edge module was exercised against a fake ad server (dedupe, forged IDs, bots, local caps, outage spool, crash recovery, in-order resend). These were manual runs, not a kept suite.
+- **No automated tests.** The brief asked for a `node --test` suite; that was dropped on request, so there is no `npm test`.
+- **The dashboard has not been viewed in a browser.** It builds, lints, and is served in production; layout and motion have not been checked visually, and the Authometry sign-in round trip has not been completed by a person yet.
+- **A development database** `gms-ads-dev-db` exists in Coolify (environment *ads-development*) and is exposed on a public port so it can be reached from a laptop. Make it private again in Coolify when it is not needed.
 
 ## Local development
 
@@ -95,17 +94,19 @@ The OAuth client is already provisioned:
 
 It was created through the Authometry management API (the connected MCP server) rather than `npx authometry apps create`, because no `AUTHOMETRY_TOKEN` was available. The result is the same application; do not run the CLI `create` as well.
 
-> **TODO: add the production redirect URI.** Once the ad server has a domain, add `https://<domain>/auth/callback` to the redirect URIs and `https://<domain>/` to the post-logout URIs, and set `PUBLIC_BASE_URL` to `https://<domain>`. The Authometry CLI (0.1.2) only has `apps create`, so use the Authometry dashboard (Applications → 55GMS Ads → Redirect URIs), or the management API: `PATCH /applications/4a6f59b7-a184-4f9e-99c3-91613131b751` with the current `version` and the full `redirectUris` and `postLogoutRedirectUris` lists.
+`https://ads.ch3n.cc/auth/callback` and `https://ads.ch3n.cc/` are registered as well, for production.
+
+To add another domain, add `https://<domain>/auth/callback` to the redirect URIs and `https://<domain>/` to the post-logout URIs, and set `PUBLIC_BASE_URL` to match. The Authometry CLI (0.1.2) only has `apps create`, so use the Authometry dashboard (Applications → 55GMS Ads → Redirect URIs) or the management API: `PATCH /applications/4a6f59b7-a184-4f9e-99c3-91613131b751` with the current `version` and the full `redirectUris` and `postLogoutRedirectUris` lists.
 
 How sign-in works: `/auth/login` creates a fresh `state`, `nonce`, and PKCE verifier, stores them in an encrypted, HTTP-only, `SameSite=Lax` cookie that lives ten minutes, and redirects to Authometry. `/auth/callback` consumes that cookie once, and `openid-client` validates the ID token's signature, issuer, audience, expiry, and nonce. Users are keyed on `(iss, sub)`. The app then issues its own session: a 15-minute access JWT and a 30-day refresh token, both HTTP-only cookies. Refresh tokens are stored hashed, rotated on every use, and the whole family is revoked if a rotated token is presented again. Sign-out is a CSRF-protected POST.
 
 ## Deploying on Coolify
 
 1. Create a Postgres database in Coolify and copy its internal connection URL.
-2. Create an application from this repository with the **Dockerfile** build pack. The container listens on port 3000 and exposes `/healthz` for the health check.
+2. Create an application from this repository with the **Dockerfile** build pack. The container listens on port 3000. Leave Coolify's own health check **off**: it probes with `curl` or `wget`, which the slim image does not include, and the deploy is rolled back as unhealthy. The Dockerfile's `HEALTHCHECK` calls `/healthz` with Node instead.
 3. **Add persistent storage** mounted at `/data/media` (Storages → Add → Volume). Uploaded creatives live there; without the volume they are lost on every redeploy. If you change `MEDIA_DIR`, mount the volume at that path instead. Use a named volume rather than a host bind mount: the container runs as the unprivileged `node` user and a bind mount would be owned by root.
 4. Set the environment variables: `PUBLIC_BASE_URL`, `DATABASE_URL`, `SESSION_SECRET`, the three `AUTHOMETRY_*` values from `.env.local`, `TRUST_PROXY=1`, and the `EMBED_*` values from the latest release.
-5. Add the production redirect URI in Authometry (the TODO above), then deploy. Migrations run on start.
+5. Make sure the domain's redirect URI is registered in Authometry (see above), then deploy. Migrations run on start.
 
 There is no CDN in front of the app. Uploaded files are served from `/media/creatives/<sha256>.<ext>` with `Cache-Control: public, max-age=31536000, immutable` and a strong `ETag`, so Coolify's proxy, or Cloudflare in front of the domain, can cache them indefinitely. A WebP variant is served when the browser's `Accept` header allows it.
 
