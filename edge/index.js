@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import { selectAd, normalizeHost, parseSizes } from './lib/selection.js';
+import { selectAd, normalizeHost, parseSizes, hostMatchesAny } from './lib/selection.js';
 
 export { selectAd, eligibleCampaigns, pickWeighted, hostMatches, domainAllowed, mulberry32 } from './lib/selection.js';
 
@@ -113,6 +113,7 @@ export function createAdsRouter(options = {}) {
   // --- State -------------------------------------------------------------
   let manifest = null; // { version, campaigns, siteKeyId, etag, fetchedAt }
   let byCampaign = new Map();
+  let hosts = null; // { exact: Set, wildcards: [] } when the manifest lists registered domains
   const counters = new Map(); // "hour|campaign|creative|domain" -> { impressions, clicks }
   let countersDirty = false;
   const batches = []; // sealed, unsent: { batchId, file, payload }
@@ -314,6 +315,9 @@ export function createAdsRouter(options = {}) {
         if (!Array.isArray(data.campaigns)) throw new Error('manifest has no campaigns array');
         manifest = { ...data, etag: res.headers.get('etag'), fetchedAt: startedAt };
         byCampaign = new Map(data.campaigns.map((c) => [c.id, c]));
+        hosts = Array.isArray(data.domains)
+          ? { exact: new Set(data.domains), wildcards: data.domains.filter((d) => d.startsWith('*.')) }
+          : null;
       } else if (res.status === 304 && manifest) {
         manifest.fetchedAt = startedAt;
       } else {
@@ -578,6 +582,10 @@ export function createAdsRouter(options = {}) {
     const groups = single ? [query.get('sizes')] : query.get('slots').split(';').slice(0, 12);
     if (!manifest || req.method === 'HEAD' || isBot(req)) return single ? send(res, 204) : send(res, 200, { ads: groups.map(() => null) });
     const domain = hostOf(req);
+    // Unregistered hosts get no ads; the ad server would reject their stats.
+    if (hosts && !hosts.exact.has(domain) && !hostMatchesAny(hosts.wildcards, domain)) {
+      return single ? send(res, 204) : send(res, 200, { ads: groups.map(() => null) });
+    }
     const used = new Set();
     const ads = groups.map((group) => {
       const sizes = parseSizes(group);
