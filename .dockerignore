@@ -1,0 +1,11 @@
+node_modules
+web/dist
+web/public/fonts
+data
+.git
+.env
+.env.*
+!.env.example
+*.local
+edge/example/.spool
+npm-debug.log
