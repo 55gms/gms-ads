@@ -37,6 +37,7 @@ app.use('/_ads', ads);
 | `instanceId` | stored in the spool | Stable ID used to split budgets between instances |
 | `mountPath` | `/_ads` | Used to build click URLs |
 | `trustForwardedHost` | `false` | Read `X-Forwarded-Host` instead of `Host` |
+| `maxDomains` | `5000` | Distinct hosts served per batch. Ads serve on any well-formed hostname that is not switched off on the ad server; this bounds made-up `Host` values |
 | `rateLimit` | `{ serve: 240, impression: 240, click: 60, windowMs: 60000 }` | Per IP |
 | `handleSignals` | `true` | Flush on `SIGTERM`/`SIGINT`. Exits the process only if the host has no handler of its own |
 | `logger` | JSON to stdout | `{ info, warn, error }` |

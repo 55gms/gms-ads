@@ -2,7 +2,6 @@
 // creatives and targeting, and the budget each edge instance may still spend.
 
 import crypto from 'node:crypto';
-import { hostMatchesAny } from '../../shared/selection.js';
 import { query } from '../db/pool.js';
 import { imageUrlFor } from './creatives.js';
 
@@ -47,7 +46,7 @@ export async function buildManifest({ siteKey, instances = 1 }) {
         WHERE c.status = 'active' AND (c.total_impression_cap IS NOT NULL OR c.daily_impression_cap IS NOT NULL)
         GROUP BY s.campaign_id`
     ),
-    query('SELECT hostname FROM domains WHERE enabled ORDER BY hostname'),
+    query('SELECT hostname FROM domains WHERE NOT enabled ORDER BY hostname'),
   ]);
 
   const used = new Map(usage.rows.map((r) => [r.campaign_id, r]));
@@ -57,8 +56,10 @@ export async function buildManifest({ siteKey, instances = 1 }) {
   const body = {
     siteKeyId: siteKey.id,
     instances,
-    // Hosts the edge may serve on. Requests for any other Host get no ad.
-    domains: domains.rows.map((d) => d.hostname).filter((h) => !allowed || hostMatchesAny(allowed, h)),
+    // Ads serve on every host except the ones switched off here.
+    blockedDomains: domains.rows.map((d) => d.hostname),
+    // Patterns this API key is limited to; null means any host.
+    allowedDomains: allowed && allowed.length ? allowed : null,
     campaigns: campaigns.rows
       .map((c) => ({
         id: c.id,

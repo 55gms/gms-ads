@@ -186,7 +186,7 @@ export function Domains() {
     <>
       <PageHeader
         title="Domains"
-        description="Ads are served only on registered hostnames. Stats from other hosts are rejected."
+        description="Ads serve on every host that loads the embed. New hosts appear here once they report traffic; switch one off to stop serving on it."
         actions={
           canWrite && (
             <Button variant="primary" icon={ListPlus} onClick={() => setParam({ import: '1' })}>
@@ -215,7 +215,7 @@ export function Domains() {
           data.search ? (
             <EmptyState icon={Search} title="No domains match" description={`Nothing found for “${data.search}”.`} />
           ) : (
-            <EmptyState icon={Globe} title="No domains yet" description="Paste your list of hostnames to register them all at once." action={canWrite ? { label: 'Add domains', icon: Plus, onClick: () => setParam({ import: '1' }) } : undefined} />
+            <EmptyState icon={Globe} title="No domains yet" description="Hosts appear here after they first report traffic. Add one ahead of time to target it or switch it off." action={canWrite ? { label: 'Add domains', icon: Plus, onClick: () => setParam({ import: '1' }) } : undefined} />
           )
         }
         footer={<Pagination page={data.page} pageSize={data.pageSize} total={data.total} onPage={(page) => setParam({ page: String(page) })} />}

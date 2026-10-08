@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
-import { selectAd, normalizeHost, parseSizes, hostMatchesAny } from './lib/selection.js';
+import { selectAd, normalizeHost, parseSizes, hostMatchesAny, isHostname } from './lib/selection.js';
 
 export { selectAd, eligibleCampaigns, pickWeighted, hostMatches, domainAllowed, mulberry32 } from './lib/selection.js';
 
@@ -92,6 +92,7 @@ export function createAdsRouter(options = {}) {
     trustForwardedHost: options.trustForwardedHost ?? false,
     rateLimit: { serve: 240, impression: 240, click: 60, windowMs: 60 * 1000, ...options.rateLimit },
     maxTrackedServes: options.maxTrackedServes ?? 500_000,
+    maxDomains: options.maxDomains ?? 5000,
     requestTimeoutMs: options.requestTimeoutMs ?? 15_000,
     retryBaseMs: options.retryBaseMs ?? 5_000,
     retryMaxMs: options.retryMaxMs ?? 10 * 60 * 1000,
@@ -113,7 +114,9 @@ export function createAdsRouter(options = {}) {
   // --- State -------------------------------------------------------------
   let manifest = null; // { version, campaigns, siteKeyId, etag, fetchedAt }
   let byCampaign = new Map();
-  let hosts = null; // { exact: Set, wildcards: [] } when the manifest lists registered domains
+  let blocked = []; // hostname patterns switched off on the ad server
+  let allowed = null; // hostname patterns this API key is limited to; null means any host
+  const seenDomains = new Set(); // hosts served since the last sealed batch, bounded by maxDomains
   const counters = new Map(); // "hour|campaign|creative|domain" -> { impressions, clicks }
   let countersDirty = false;
   const batches = []; // sealed, unsent: { batchId, file, payload }
@@ -315,9 +318,8 @@ export function createAdsRouter(options = {}) {
         if (!Array.isArray(data.campaigns)) throw new Error('manifest has no campaigns array');
         manifest = { ...data, etag: res.headers.get('etag'), fetchedAt: startedAt };
         byCampaign = new Map(data.campaigns.map((c) => [c.id, c]));
-        hosts = Array.isArray(data.domains)
-          ? { exact: new Set(data.domains), wildcards: data.domains.filter((d) => d.startsWith('*.')) }
-          : null;
+        blocked = Array.isArray(data.blockedDomains) ? data.blockedDomains : [];
+        allowed = Array.isArray(data.allowedDomains) ? data.allowedDomains : null;
       } else if (res.status === 304 && manifest) {
         manifest.fetchedAt = startedAt;
       } else {
@@ -348,6 +350,7 @@ export function createAdsRouter(options = {}) {
 
   // --- Batching and flush ------------------------------------------------
   function sealBatch() {
+    seenDomains.clear();
     if (!counters.size) return null;
     const rows = [];
     let min = Infinity;
@@ -576,16 +579,26 @@ export function createAdsRouter(options = {}) {
     };
   }
 
+  // The Host header is the caller's to choose, so only well-formed names are
+  // accepted and the number of distinct hosts per batch is bounded.
+  function canServe(domain) {
+    if (!isHostname(domain)) return false;
+    if (hostMatchesAny(blocked, domain)) return false;
+    if (allowed && !hostMatchesAny(allowed, domain)) return false;
+    if (seenDomains.has(domain)) return true;
+    if (seenDomains.size >= opts.maxDomains) return false;
+    seenDomains.add(domain);
+    return true;
+  }
+
   function handleServe(req, res, query) {
     const now = opts.now();
     const single = !query.has('slots');
     const groups = single ? [query.get('sizes')] : query.get('slots').split(';').slice(0, 12);
     if (!manifest || req.method === 'HEAD' || isBot(req)) return single ? send(res, 204) : send(res, 200, { ads: groups.map(() => null) });
     const domain = hostOf(req);
-    // Unregistered hosts get no ads; the ad server would reject their stats.
-    if (hosts && !hosts.exact.has(domain) && !hostMatchesAny(hosts.wildcards, domain)) {
-      return single ? send(res, 204) : send(res, 200, { ads: groups.map(() => null) });
-    }
+    // Any real hostname is served unless it was switched off on the ad server.
+    if (!canServe(domain)) return single ? send(res, 204) : send(res, 200, { ads: groups.map(() => null) });
     const used = new Set();
     const ads = groups.map((group) => {
       const sizes = parseSizes(group);

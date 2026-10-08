@@ -13,6 +13,14 @@ export function normalizeHost(host) {
   return h;
 }
 
+const HOST_LABEL = '[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?';
+const HOSTNAME_RE = new RegExp(`^(?:${HOST_LABEL}\\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]$`);
+
+// A plain, lower-case DNS name with at least one dot. No wildcards, IPs, or ports.
+export function isHostname(host) {
+  return typeof host === 'string' && host.length <= 253 && HOSTNAME_RE.test(host);
+}
+
 // `*.example.com` matches any subdomain depth, but not the apex itself.
 export function hostMatches(pattern, host) {
   if (!pattern || !host) return false;

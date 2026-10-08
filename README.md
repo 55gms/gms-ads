@@ -150,7 +150,7 @@ The Snippet page in the dashboard generates this with the current version and ha
 <div data-55gms-ad data-size="728x90"></div>   <!-- fixed size -->
 ```
 
-Because the script only calls `/_ads/*` on the page's own origin, the same tag works on every domain with no CORS. Register the domains under **Domains** (bulk paste, `*.example.com` wildcards supported): the edge serves nothing on hosts that are not registered and enabled.
+Because the script only calls `/_ads/*` on the page's own origin, the same tag works on every domain with no CORS. No domain has to be registered: ads serve on any host that reaches the edge, and each new host shows up under **Domains** after its first hourly batch. Switch a domain off there (or add one ahead of time, `*.example.com` wildcards supported, and switch it off) to stop serving on it.
 
 ### Trying it end to end locally
 
@@ -158,7 +158,7 @@ Because the script only calls `/_ads/*` on the page's own origin, the same tag w
 ADS_SERVER_URL=http://localhost:3000 ADS_API_KEY=gms_live_... ADS_EDGE_SECRET=dev node edge/example/server.js
 ```
 
-`localhost` cannot be registered as a domain (a hostname needs a dot), so add an entry such as `ads.test` to `/etc/hosts`, register `ads.test` under Domains, and open `http://ads.test:4000`. Stats normally arrive at the top of the hour; to send them now:
+`localhost` gets no ads (a hostname needs a dot), so add an entry such as `ads.test` to `/etc/hosts` and open `http://ads.test:4000`. Stats normally arrive at the top of the hour; to send them now:
 
 ```bash
 curl -X POST http://ads.test:4000/_debug/flush
@@ -179,7 +179,7 @@ The repository must be public for jsDelivr to read it. To publish through npm in
 
 ## How delivery works
 
-- **Manifest** (`GET /api/v1/manifest`): active campaigns with weight, schedule, click URL, targeting, creatives, and remaining budgets, plus the list of registered domains. It has an `ETag`; an unchanged manifest answers 304.
+- **Manifest** (`GET /api/v1/manifest`): active campaigns with weight, schedule, click URL, targeting, creatives, and remaining budgets, plus the list of switched-off domains. It has an `ETag`; an unchanged manifest answers 304.
 - **Selection**: weighted random among campaigns that are in schedule, allowed on the domain, under budget, and have a creative in the best size the slot can take. The function lives in `edge/lib/selection.js` and is re-exported from `shared/selection.js`.
 - **Serve IDs** are HMAC-signed tokens carrying campaign, creative, domain, and time. An impression counts once per serve and only within 10 minutes; a click counts once per serve. Bots and `HEAD` requests are not counted.
 - **Viewability**: `ads.js` reports an impression only after the ad is at least 50% visible for one continuous second, and sends all of a page's impressions in one beacon.
@@ -196,7 +196,7 @@ Caps can overshoot in two bounded cases: when the number of instances changes be
 
 - **Access tokens are signed with Node's `crypto`** (HS256) instead of adding a JWT library; the app only signs and verifies its own tokens. `openid-client` is the one library added outside the brief's list, as the brief requires.
 - **Creatives are a library.** A creative may be unassigned or attached to one campaign; duplicating a campaign copies the rows and reuses the same content-addressed file.
-- **Unregistered hosts get no ads.** The manifest lists registered domains so the edge never produces stats the server would reject.
+- **Every host gets ads unless it is switched off.** The Domains list is a record of hosts seen plus an off switch, not an allowlist. The `Host` header is the caller's to choose, so the edge accepts only well-formed hostnames and at most `maxDomains` (5000) distinct hosts per batch, and the server adds at most 500 new hosts to the list per batch. Rows for a switched-off host are dropped without rejecting the batch.
 - **Deleting a campaign with unreported stats rejects that batch.** The brief requires unknown campaigns to fail the batch. Prefer ending a campaign and deleting it after the next hourly batch.
 - **External creatives are served from their own URL**, not proxied. `GET /api/v1/creatives/:id/image` redirects to wherever an image lives.
 - **Stats use the viewer's timezone for day buckets**; data is stored in UTC hours.

@@ -2,7 +2,7 @@
 // stats_hourly in one transaction. Replays of an accepted batchId change
 // nothing and return the original result.
 
-import { hostMatchesAny } from '../../shared/selection.js';
+import { hostMatchesAny, isHostname } from '../../shared/selection.js';
 import { isUuid } from '../../shared/validators.js';
 import { query, tx } from '../db/pool.js';
 
@@ -11,6 +11,8 @@ const MAX_ROWS = 200_000;
 const MAX_COUNT = 10_000_000;
 const MAX_REPORTED_ERRORS = 100;
 const CHUNK = 5000;
+// Hosts added to the Domains list per batch. Stats are kept for all of them.
+const MAX_NEW_DOMAINS = 500;
 
 export class BatchRejected extends Error {
   constructor(message, details) {
@@ -52,23 +54,32 @@ async function validateRows(rows, { start, end, siteKey, now }) {
   const [campaigns, creatives, domains] = await Promise.all([
     query('SELECT id FROM campaigns'),
     query('SELECT id FROM creatives'),
-    query('SELECT hostname FROM domains'),
+    query('SELECT hostname, enabled FROM domains'),
   ]);
   const campaignIds = new Set(campaigns.rows.map((r) => r.id));
   const creativeIds = new Set(creatives.rows.map((r) => r.id));
-  const exact = new Set();
+  const known = new Set();
   const wildcards = [];
-  for (const { hostname } of domains.rows) {
+  const blocked = [];
+  for (const { hostname, enabled } of domains.rows) {
+    if (!enabled) blocked.push(hostname);
     if (hostname.startsWith('*.')) wildcards.push(hostname);
-    else exact.add(hostname);
+    else known.add(hostname);
   }
+  // true: count it. false: the host is switched off, drop the row quietly so
+  // a domain disabled mid-hour cannot reject the whole batch. string: reject.
   const domainCache = new Map();
+  const discovered = new Set();
   const domainOk = (host) => {
     let ok = domainCache.get(host);
     if (ok === undefined) {
-      const registered = exact.has(host) || hostMatchesAny(wildcards, host);
-      const permitted = !siteKey.allowedDomains || hostMatchesAny(siteKey.allowedDomains, host);
-      ok = registered ? (permitted ? true : 'domain is not allowed for this API key') : 'domain is not registered';
+      if (!isHostname(host)) ok = 'domain must be a hostname';
+      else if (siteKey.allowedDomains && !hostMatchesAny(siteKey.allowedDomains, host)) ok = 'domain is not allowed for this API key';
+      else if (hostMatchesAny(blocked, host)) ok = false;
+      else {
+        ok = true;
+        if (!known.has(host) && !hostMatchesAny(wildcards, host)) discovered.add(host);
+      }
       domainCache.set(host, ok);
     }
     return ok;
@@ -79,6 +90,7 @@ async function validateRows(rows, { start, end, siteKey, now }) {
   const merged = new Map();
   rows.forEach((row, index) => {
     const problems = [];
+    let skip = false;
     if (!row || typeof row !== 'object') problems.push('row must be an object');
     else {
       const hour = typeof row.hour === 'string' ? Date.parse(row.hour) : NaN;
@@ -91,11 +103,12 @@ async function validateRows(rows, { start, end, siteKey, now }) {
       if (typeof row.domain !== 'string' || row.domain.length > 253) problems.push('domain must be a hostname');
       else {
         const ok = domainOk(row.domain.toLowerCase());
-        if (ok !== true) problems.push(ok);
+        if (ok === false) skip = true;
+        else if (ok !== true) problems.push(ok);
       }
       if (!validCount(row.impressions)) problems.push('impressions must be a whole number from 0 to 10,000,000');
       if (!validCount(row.clicks)) problems.push('clicks must be a whole number from 0 to 10,000,000');
-      if (!problems.length) {
+      if (!problems.length && !skip) {
         const iso = new Date(hour).toISOString();
         const key = `${row.campaignId}|${row.creativeId}|${row.domain.toLowerCase()}|${iso}`;
         const current = merged.get(key);
@@ -121,7 +134,7 @@ async function validateRows(rows, { start, end, siteKey, now }) {
       if (bad.length < MAX_REPORTED_ERRORS) bad.push({ index, errors: problems });
     }
   });
-  return { bad, badCount, rows: [...merged.values()] };
+  return { bad, badCount, rows: [...merged.values()], discovered: [...discovered].slice(0, MAX_NEW_DOMAINS) };
 }
 
 async function recordRejection(body, siteKey, details) {
@@ -197,6 +210,11 @@ export async function ingestBatch(body, siteKey, now = Date.now()) {
           chunk.map((r) => r.clicks),
         ]
       );
+    }
+    // Hosts seen for the first time join the Domains list, enabled, so they
+    // can be targeted or switched off from the dashboard.
+    if (checked.discovered.length) {
+      await db.query('INSERT INTO domains (hostname) SELECT unnest($1::text[]) ON CONFLICT (hostname) DO NOTHING', [checked.discovered]);
     }
     return result(claimed.rows[0], false);
   });
