@@ -2,8 +2,10 @@ import pg from 'pg';
 import { config } from '../config.js';
 import { logger } from '../logger.js';
 
-// COUNT/SUM come back as bigint; the dashboard's numbers fit in a double.
-pg.types.setTypeParser(20, (v) => Number(v));
+// bigint (20) and numeric (1700, what sum() over bigint returns) arrive as
+// strings by default. Every such value here is a count that fits in a double.
+pg.types.setTypeParser(20, Number);
+pg.types.setTypeParser(1700, Number);
 
 const ssl = config.pgSsl ? { rejectUnauthorized: false } : undefined;
 

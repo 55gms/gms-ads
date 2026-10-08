@@ -71,7 +71,7 @@ statsRouter.get(
     const f = filters(req.query);
     const unit = req.query.granularity === 'hour' ? 'hour' : 'day';
     f.params.push(f.tz);
-    const tz = `$${f.params.length}`;
+    const tz = `$${f.params.length}::text`;
     // Buckets follow the viewer's timezone so "today" means their today.
     const { rows } = await query(
       `SELECT date_trunc('${unit}', s.hour AT TIME ZONE ${tz}) AT TIME ZONE ${tz} AS t,
@@ -138,7 +138,7 @@ statsRouter.get(
   asyncHandler(async (req, res) => {
     const f = filters(req.query);
     f.params.push(f.tz);
-    const tz = `$${f.params.length}`;
+    const tz = `$${f.params.length}::text`;
     const { rows } = await query(
       `SELECT to_char(date_trunc('day', s.hour AT TIME ZONE ${tz}), 'YYYY-MM-DD') AS day, s.domain,
               coalesce(c.name, 'Deleted campaign') AS campaign,

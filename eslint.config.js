@@ -3,6 +3,8 @@ import globals from 'globals';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 
+const loaders = ['overview', 'campaigns', 'creatives', 'analytics', 'domains', 'members', 'sizes', 'keys', 'ingest', 'audit'].map((n) => `${n}Loader`);
+
 export default [
   { ignores: ['web/dist', 'embed/dist', 'node_modules', 'web/public'] },
   js.configs.recommended,
@@ -27,8 +29,10 @@ export default [
     plugins: { 'react-hooks': reactHooks, 'react-refresh': reactRefresh },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
-      'no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^[A-Z_]', caughtErrors: 'none' }],
+      // Route modules export their loader next to the page component.
+      'react-refresh/only-export-components': ['warn', { allowConstantExport: true, allowExportNames: loaders }],
+      // Capitalised names are components passed as props (icon: Icon).
+      'no-unused-vars': ['error', { argsIgnorePattern: '^(_|[A-Z])', varsIgnorePattern: '^[A-Z_]', caughtErrors: 'none' }],
     },
   },
 ];

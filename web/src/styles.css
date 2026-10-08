@@ -1,0 +1,491 @@
+@import 'tailwindcss';
+
+@font-face {
+  font-family: 'Geist';
+  src: url('/fonts/Geist-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('/fonts/GeistMono-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ---------------------------------------------------------------------------
+   Design tokens. Raw values live here and nowhere else; components reach them
+   through the Tailwind theme below.
+   ------------------------------------------------------------------------ */
+:root {
+  color-scheme: light;
+  --ds-background-100: #ffffff;
+  --ds-background-200: #fafafa;
+  --ds-gray-100: #f2f2f2;
+  --ds-gray-200: #ebebeb;
+  --ds-gray-300: #e6e6e6;
+  --ds-gray-400: #eaeaea;
+  --ds-gray-500: #c9c9c9;
+  --ds-gray-600: #a8a8a8;
+  --ds-gray-700: #8f8f8f;
+  --ds-gray-900: #666666;
+  --ds-gray-1000: #171717;
+
+  --ds-gray-alpha-100: rgb(0 0 0 / 0.04);
+  --ds-gray-alpha-200: rgb(0 0 0 / 0.08);
+  --ds-gray-alpha-300: rgb(0 0 0 / 0.12);
+  --ds-gray-alpha-400: rgb(0 0 0 / 0.2);
+  --ds-gray-alpha-500: rgb(0 0 0 / 0.4);
+  --ds-gray-alpha-600: rgb(0 0 0 / 0.6);
+
+  --ds-blue: #0070f3;
+  --ds-blue-text: #005bd1;
+  --ds-blue-soft: rgb(0 112 243 / 0.09);
+  --ds-blue-border: rgb(0 112 243 / 0.32);
+  --ds-green: #29a948;
+  --ds-green-text: #17782f;
+  --ds-green-soft: rgb(41 169 72 / 0.11);
+  --ds-green-border: rgb(41 169 72 / 0.36);
+  --ds-amber: #f5a623;
+  --ds-amber-text: #944f00;
+  --ds-amber-soft: rgb(245 166 35 / 0.14);
+  --ds-amber-border: rgb(245 166 35 / 0.45);
+  --ds-red: #e5484d;
+  --ds-red-text: #c2282e;
+  --ds-red-soft: rgb(229 72 77 / 0.09);
+  --ds-red-border: rgb(229 72 77 / 0.34);
+  --ds-purple: #7928ca;
+  --ds-purple-text: #6a1fb5;
+  --ds-purple-soft: rgb(121 40 202 / 0.09);
+  --ds-purple-border: rgb(121 40 202 / 0.3);
+
+  --ds-shadow-popover: 0 4px 8px -4px rgb(0 0 0 / 0.1), 0 16px 24px -8px rgb(0 0 0 / 0.06);
+  --ds-shadow-modal: 0 8px 16px -4px rgb(0 0 0 / 0.08), 0 24px 48px -12px rgb(0 0 0 / 0.18);
+  --ds-surface-raised: var(--ds-background-100);
+
+  /* Authometry's sign-in button colours, as specified by Authometry. */
+  --authometry-bg: transparent;
+  --authometry-bg-hover: rgb(99 91 255 / 0.06);
+  --authometry-border: #d8d8df;
+  --authometry-border-hover: #aaa5c5;
+  --authometry-text: #18181b;
+  --authometry-focus: #7c73ff;
+
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 300ms;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --ds-background-100: #0a0a0a;
+  --ds-background-200: #000000;
+  --ds-gray-100: #1a1a1a;
+  --ds-gray-200: #1f1f1f;
+  --ds-gray-300: #292929;
+  --ds-gray-400: #2e2e2e;
+  --ds-gray-500: #454545;
+  --ds-gray-600: #878787;
+  --ds-gray-700: #8f8f8f;
+  --ds-gray-900: #a1a1a1;
+  --ds-gray-1000: #ededed;
+
+  --ds-gray-alpha-100: rgb(255 255 255 / 0.04);
+  --ds-gray-alpha-200: rgb(255 255 255 / 0.08);
+  --ds-gray-alpha-300: rgb(255 255 255 / 0.12);
+  --ds-gray-alpha-400: rgb(255 255 255 / 0.2);
+  --ds-gray-alpha-500: rgb(0 0 0 / 0.55);
+  --ds-gray-alpha-600: rgb(255 255 255 / 0.6);
+
+  --ds-blue: #3291ff;
+  --ds-blue-text: #52a8ff;
+  --ds-blue-soft: rgb(50 145 255 / 0.14);
+  --ds-blue-border: rgb(50 145 255 / 0.4);
+  --ds-green: #45a557;
+  --ds-green-text: #62c073;
+  --ds-green-soft: rgb(69 165 87 / 0.15);
+  --ds-green-border: rgb(69 165 87 / 0.42);
+  --ds-amber: #ffb224;
+  --ds-amber-text: #ffb224;
+  --ds-amber-soft: rgb(255 178 36 / 0.13);
+  --ds-amber-border: rgb(255 178 36 / 0.4);
+  --ds-red: #ff6369;
+  --ds-red-text: #ff7b80;
+  --ds-red-soft: rgb(255 99 105 / 0.13);
+  --ds-red-border: rgb(255 99 105 / 0.4);
+  --ds-purple: #8e4ec6;
+  --ds-purple-text: #bf7af0;
+  --ds-purple-soft: rgb(142 78 198 / 0.17);
+  --ds-purple-border: rgb(142 78 198 / 0.45);
+
+  /* Dark mode leans on the border and a lighter surface instead of shadow. */
+  --ds-shadow-popover: 0 0 0 0 transparent;
+  --ds-shadow-modal: 0 24px 48px -12px rgb(0 0 0 / 0.6);
+  --ds-surface-raised: #111111;
+
+  --authometry-bg: #18181b;
+  --authometry-bg-hover: #232326;
+  --authometry-border: #34343a;
+  --authometry-border-hover: #575260;
+  --authometry-text: #ffffff;
+}
+
+/* Easing curves are real theme values (always emitted) so both utilities
+   such as ease-out and plain CSS can use var(--ease-out). */
+@theme static {
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@theme inline {
+  --color-*: initial;
+  --color-background-100: var(--ds-background-100);
+  --color-background-200: var(--ds-background-200);
+  --color-raised: var(--ds-surface-raised);
+  --color-gray-100: var(--ds-gray-100);
+  --color-gray-200: var(--ds-gray-200);
+  --color-gray-300: var(--ds-gray-300);
+  --color-gray-400: var(--ds-gray-400);
+  --color-gray-500: var(--ds-gray-500);
+  --color-gray-600: var(--ds-gray-600);
+  --color-gray-700: var(--ds-gray-700);
+  --color-gray-900: var(--ds-gray-900);
+  --color-gray-1000: var(--ds-gray-1000);
+  --color-gray-alpha-100: var(--ds-gray-alpha-100);
+  --color-gray-alpha-200: var(--ds-gray-alpha-200);
+  --color-gray-alpha-300: var(--ds-gray-alpha-300);
+  --color-gray-alpha-400: var(--ds-gray-alpha-400);
+  --color-gray-alpha-500: var(--ds-gray-alpha-500);
+  --color-gray-alpha-600: var(--ds-gray-alpha-600);
+  --color-blue: var(--ds-blue);
+  --color-blue-text: var(--ds-blue-text);
+  --color-blue-soft: var(--ds-blue-soft);
+  --color-blue-border: var(--ds-blue-border);
+  --color-green: var(--ds-green);
+  --color-green-text: var(--ds-green-text);
+  --color-green-soft: var(--ds-green-soft);
+  --color-green-border: var(--ds-green-border);
+  --color-amber: var(--ds-amber);
+  --color-amber-text: var(--ds-amber-text);
+  --color-amber-soft: var(--ds-amber-soft);
+  --color-amber-border: var(--ds-amber-border);
+  --color-red: var(--ds-red);
+  --color-red-text: var(--ds-red-text);
+  --color-red-soft: var(--ds-red-soft);
+  --color-red-border: var(--ds-red-border);
+  --color-purple: var(--ds-purple);
+  --color-purple-text: var(--ds-purple-text);
+  --color-purple-soft: var(--ds-purple-soft);
+  --color-purple-border: var(--ds-purple-border);
+
+  --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --shadow-popover: var(--ds-shadow-popover);
+  --shadow-modal: var(--ds-shadow-modal);
+
+  --animate-pop-in: pop-in var(--duration-base) var(--ease-out) both;
+  --animate-pop-out: pop-out 150ms var(--ease-in) both;
+  --animate-fade-in: fade-in 150ms var(--ease-standard) both;
+  --animate-fade-out: fade-out 150ms var(--ease-in) both;
+  --animate-sheet-in: sheet-in var(--duration-slow) var(--ease-out) both;
+  --animate-sheet-out: sheet-out 220ms var(--ease-in) both;
+  --animate-rise-in: rise-in var(--duration-slow) var(--ease-out) both;
+  --animate-rise-out: rise-out 220ms var(--ease-in) both;
+  --animate-toast-in: toast-in var(--duration-base) var(--ease-out) both;
+  --animate-tip-in: tip-in var(--duration-base) var(--ease-out) both;
+  --animate-shimmer: shimmer 1.5s linear infinite;
+  --animate-pulse-ring: pulse-ring 2s var(--ease-out) infinite;
+  --animate-spin: spin 0.7s linear infinite;
+  --animate-fill: fill-x 600ms var(--ease-out) both;
+  --animate-draw: draw 600ms var(--ease-out) both;
+  --animate-check: check-in 150ms var(--ease-out) both;
+}
+
+/* Typography helpers that pair size, line height, weight, and tracking. */
+@utility heading-32 {
+  font-size: 32px;
+  line-height: 40px;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+@utility heading-24 {
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+@utility heading-20 {
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+@utility heading-16 {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+@utility copy-14 {
+  font-size: 14px;
+  line-height: 20px;
+}
+@utility copy-13 {
+  font-size: 13px;
+  line-height: 18px;
+}
+@utility copy-12 {
+  font-size: 12px;
+  line-height: 16px;
+}
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+@utility ease-hover {
+  transition-property: background-color, border-color, color, opacity, box-shadow;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--ease-standard);
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    background: var(--ds-background-100);
+    color: var(--ds-gray-1000);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    scrollbar-gutter: stable;
+  }
+  body {
+    font-size: 14px;
+    line-height: 20px;
+    min-height: 100dvh;
+  }
+  code,
+  kbd,
+  pre,
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+  ::selection {
+    background: var(--ds-blue-soft);
+  }
+  ::placeholder {
+    color: var(--ds-gray-600);
+    opacity: 1;
+  }
+  /* One focus treatment for everything: a blue ring separated from the
+     element by a gap in the page colour, so it reads on any surface. */
+  :focus-visible {
+    outline: 2px solid var(--ds-blue);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px var(--ds-background-100);
+  }
+  button,
+  [role='button'],
+  a,
+  summary,
+  select,
+  label[for] {
+    cursor: pointer;
+  }
+  :disabled,
+  [aria-disabled='true'] {
+    cursor: not-allowed;
+  }
+  /* The theme swap sets this for one frame so colours change at once. */
+  .theme-switching *,
+  .theme-switching *::before,
+  .theme-switching *::after {
+    transition: none !important;
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+@keyframes fade-out {
+  to { opacity: 0; }
+}
+/* Popovers and menus: --pop-x / --pop-y carry the 4px offset from the trigger side. */
+@keyframes pop-in {
+  from { opacity: 0; transform: translate(var(--pop-x, 0), var(--pop-y, -4px)) scale(0.96); }
+}
+@keyframes pop-out {
+  to { opacity: 0; transform: translate(var(--pop-x, 0), var(--pop-y, -4px)) scale(0.96); }
+}
+@keyframes tip-in {
+  from { opacity: 0; transform: translateY(var(--pop-y, 2px)); }
+}
+@keyframes sheet-in {
+  from { transform: translateX(100%); }
+}
+@keyframes sheet-out {
+  to { transform: translateX(100%); }
+}
+@keyframes rise-in {
+  from { transform: translateY(100%); }
+}
+@keyframes rise-out {
+  to { transform: translateY(100%); }
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+}
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 0.55; }
+  70%, 100% { transform: scale(2.6); opacity: 0; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes fill-x {
+  from { transform: scaleX(0); }
+}
+@keyframes draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes check-in {
+  from { opacity: 0; transform: scale(0.6); }
+}
+
+.skeleton {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--ds-gray-100) 25%, var(--ds-gray-200) 37%, var(--ds-gray-100) 63%);
+  background-size: 400% 100%;
+  animation: var(--animate-shimmer);
+}
+
+/* Horizontal scroll areas fade at the edges instead of ending abruptly. */
+.edge-fade {
+  mask-image: linear-gradient(to right, transparent, #000 16px, #000 calc(100% - 16px), transparent);
+}
+
+/* Slider: native range input drawn with tokens. --fill is set inline. */
+.slider {
+  appearance: none;
+  height: 20px;
+  background: transparent;
+}
+.slider::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--ds-gray-1000) var(--fill), var(--ds-gray-300) var(--fill));
+}
+.slider::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--ds-gray-300);
+}
+.slider::-moz-range-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--ds-gray-1000);
+}
+.slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: 999px;
+  background: var(--ds-background-100);
+  border: 1px solid var(--ds-gray-500);
+  box-shadow: 0 1px 2px var(--ds-gray-alpha-300);
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+.slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--ds-background-100);
+  border: 1px solid var(--ds-gray-500);
+}
+.slider:active::-webkit-slider-thumb {
+  transform: scale(1.12);
+}
+
+.authometry-button {
+  display: inline-flex;
+  min-height: 44px;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 16px;
+  border: 1px solid var(--authometry-border);
+  border-radius: 10px;
+  background: var(--authometry-bg);
+  color: var(--authometry-text);
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1;
+  text-decoration: none;
+  transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+}
+.authometry-button:hover {
+  background: var(--authometry-bg-hover);
+  border-color: var(--authometry-border-hover);
+}
+.authometry-button:active {
+  transform: scale(0.98);
+}
+.authometry-button:focus-visible {
+  outline: 2px solid var(--authometry-focus);
+  outline-offset: 2px;
+}
+
+/* Route changes cross-fade quickly when the browser supports view transitions. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 150ms;
+  animation-timing-function: var(--ease-standard);
+}
+
+/* Reduced motion: no transforms, shimmers, pulses, or draw-ins. Short
+   opacity fades stay so state changes are still visible. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-property: opacity, color, background-color, border-color !important;
+    scroll-behavior: auto !important;
+  }
+  [data-motion] {
+    animation-name: fade-in !important;
+    animation-duration: 120ms !important;
+  }
+  [data-motion][data-state='closed'] {
+    animation-name: fade-out !important;
+  }
+  .skeleton,
+  [data-motion='loop'] {
+    animation: none !important;
+  }
+  [data-motion='draw'] {
+    animation: none !important;
+    stroke-dashoffset: 0 !important;
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+  .authometry-button:active {
+    transform: none;
+  }
+}

@@ -38,7 +38,7 @@ async function upsertUser(claims) {
        VALUES ($1, $2, $3, $4, $5, $6, $7, now()) RETURNING *`,
       [claims.iss, claims.sub, ...profile, role, status]
     );
-    await db.query(`INSERT INTO audit_log (user_id, action, entity_type, entity_id, detail) VALUES ($1, 'user.joined', 'user', $1, $2)`, [
+    await db.query(`INSERT INTO audit_log (user_id, action, entity_type, entity_id, detail) VALUES ($1::uuid, 'user.joined', 'user', $1::uuid::text, $2)`, [
       created.rows[0].id,
       JSON.stringify({ role, status }),
     ]);
