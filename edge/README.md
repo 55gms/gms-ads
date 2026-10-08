@@ -21,6 +21,7 @@ app.use('/_ads', ads);
 | `GET /serve?slots=728x90,468x60;300x250` | Several slots in one call: `{ ads: [ad or null, ...] }`. Used by `ads.js` |
 | `POST /i` | Body `{ serveId }` or `{ serveIds: [...] }`. Counts once per serve, within 10 minutes |
 | `GET /c/:serveId` | Counts the click once and redirects to the campaign's click URL |
+| `GET /m/:file` | An uploaded creative image named by the current manifest, cached from the ad server. Ads point here instead of at the ad server |
 
 ## Options
 
@@ -37,6 +38,7 @@ app.use('/_ads', ads);
 | `instanceId` | stored in the spool | Stable ID used to split budgets between instances |
 | `mountPath` | `/_ads` | Used to build click URLs |
 | `trustForwardedHost` | `false` | Read `X-Forwarded-Host` instead of `Host` |
+| `cacheMedia` | `true` | Serve uploaded creative images from this origin at `/m/<file>`, fetched once from the ad server and kept in memory. `false` sends browsers to the ad server's `/media` URL |
 | `maxDomains` | `5000` | Distinct hosts served per batch. Ads serve on any well-formed hostname that is not switched off on the ad server; this bounds made-up `Host` values |
 | `rateLimit` | `{ serve: 240, impression: 240, click: 60, windowMs: 60000 }` | Per IP |
 | `handleSignals` | `true` | Flush on `SIGTERM`/`SIGINT`. Exits the process only if the host has no handler of its own |

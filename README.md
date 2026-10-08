@@ -8,7 +8,7 @@ Browser ──ads.js (jsDelivr)──▶ 55GMS server /_ads/*  ──(manifest p
                                        └──────── hourly batch of stats (POST) ─────────┘
 ```
 
-Browsers never talk to the ad server, except to load uploaded images from `/media`. The 55GMS game server mounts the edge module, which serves from a cached manifest and reports hourly aggregates.
+Browsers never talk to the ad server: the edge also serves uploaded images from its own origin (`/_ads/m/<file>`), fetching each one from `/media` once and caching it. The 55GMS game server mounts the edge module, which serves from a cached manifest and reports hourly aggregates.
 
 | Path | What it is |
 |---|---|
