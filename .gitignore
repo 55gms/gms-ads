@@ -147,3 +147,12 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# gms-ads
+!embed/dist
+!embed/dist/**
+web/dist
+web/public/fonts
+/data
+.spool
+*.local

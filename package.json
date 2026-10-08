@@ -1,0 +1,47 @@
+{
+  "name": "gms-ads",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Self-hosted ad server and ad manager for 55GMS",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.js",
+    "build": "node scripts/copy-fonts.js && vite build --config web/vite.config.js",
+    "build:embed": "node scripts/build-embed.js",
+    "release:embed": "node scripts/release-embed.js",
+    "start": "node server/index.js",
+    "migrate": "node server/db/migrate.js",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "express": "^4.22.3",
+    "express-rate-limit": "^8.7.1",
+    "file-type": "^22.1.1",
+    "helmet": "^8.3.0",
+    "ipaddr.js": "^2.5.0",
+    "multer": "^2.4.0",
+    "openid-client": "^6.8.8",
+    "pg": "^8.23.1",
+    "sharp": "^0.35.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^5.2.0",
+    "axios": "^1.20.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "geist": "^1.7.2",
+    "globals": "^17.13.0",
+    "lucide-react": "^1.52.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-router": "^7.18.4",
+    "tailwindcss": "^4.3.3",
+    "vite": "^7.3.7"
+  }
+}
