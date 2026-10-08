@@ -19,7 +19,7 @@ v1Router.get(
     if (!isUuid(req.params.id)) return res.status(404).json({ error: 'not_found', message: 'Not found' });
     const { rows } = await query('SELECT source, external_url, file_path FROM creatives WHERE id = $1', [req.params.id]);
     if (!rows[0]) return res.status(404).json({ error: 'not_found', message: 'Not found' });
-    res.set('Cache-Control', 'public, max-age=300');
+    res.set({ 'Cache-Control': 'public, max-age=300', 'Cross-Origin-Resource-Policy': 'cross-origin' });
     res.redirect(302, imageUrlFor(rows[0]));
   })
 );
