@@ -101,8 +101,8 @@ ADS_SPOOL_DIR=/var/lib/55gms-ads  # must survive restarts`;
           </Link>{' '}
           first.
         </p>
-        <CodeBlock label="server.js" code={install} />
-        <CodeBlock label="Environment" code={env} />
+        <CodeBlock label="server.js" lang="js" code={install} />
+        <CodeBlock label="Environment" lang="env" code={env} />
       </Step>
 
       <Step number={2} title="Add the script tag">
@@ -110,16 +110,16 @@ ADS_SPOOL_DIR=/var/lib/55gms-ads  # must survive restarts`;
           Paste this once into the shared site template. It is pinned to version <span className="font-mono text-gray-1000">{version || 'unset'}</span> and verified with Subresource Integrity, so the browser refuses a file that differs from this release.
         </p>
         {sri ? (
-          <CodeBlock label="Pinned, with SRI (recommended)" code={script} />
+          <CodeBlock label="Pinned, with SRI (recommended)" lang="html" code={script} />
         ) : (
           <p role="alert" className="flex items-start gap-2 rounded-md border border-amber-border bg-amber-soft p-3 copy-13 text-amber-text">
             <TriangleAlert size={16} strokeWidth={1.5} aria-hidden="true" className="mt-0.5 shrink-0" />
             No release hash is configured. Run npm run release:embed, then set EMBED_VERSION and EMBED_SRI on the ad server.
           </p>
         )}
-        <CodeBlock label="Ad slots" code={slots} />
+        <CodeBlock label="Ad slots" lang="html" code={slots} />
         <div>
-          <CodeBlock label={`Alternative: floating major version @${major}`} code={floating} />
+          <CodeBlock label={`Alternative: floating major version @${major}`} lang="html" code={floating} />
           <p className="mt-2 flex items-start gap-2 copy-13 text-amber-text">
             <TriangleAlert size={16} strokeWidth={1.5} aria-hidden="true" className="mt-0.5 shrink-0" />
             The floating URL picks up new {major}.x releases automatically, but it cannot use SRI, so the browser does not verify the file.

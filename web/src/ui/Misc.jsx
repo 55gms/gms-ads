@@ -2,6 +2,7 @@ import { ArrowDownRight, ArrowUpRight, Check, Copy, Minus } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { cx } from '../lib/cx.js';
 import { absoluteTime, relativeTime } from '../lib/format.js';
+import { highlight } from '../lib/highlight.js';
 import { useCountUp, useNow } from '../lib/hooks.js';
 import { Button } from './Button.jsx';
 import { Tooltip } from './Floating.jsx';
@@ -82,12 +83,24 @@ export function CopyButton({ value, label = 'Copy', className }) {
   );
 }
 
-export function CodeBlock({ code, label, className }) {
+const tokenTone = {
+  comment: 'text-gray-900',
+  keyword: 'text-pink-text',
+  string: 'text-green-text',
+  function: 'text-purple-text',
+  constant: 'text-blue-text',
+  number: 'text-blue-text',
+};
+
+// `lang` turns on syntax colors: js, env, html, or json.
+export function CodeBlock({ code, label, lang, className }) {
   return (
     <div className={cx('relative rounded-md border border-gray-400 bg-background-200', className)}>
       {label && <div className="border-b border-gray-400 px-4 py-2 copy-12 text-gray-900">{label}</div>}
       <pre tabIndex={0} className="overflow-x-auto p-4 pr-14 font-mono text-[13px] leading-5 text-gray-1000">
-        <code>{code}</code>
+        <code>
+          {highlight(code, lang).map((token, i) => (token.type ? <span key={i} className={tokenTone[token.type]}>{token.text}</span> : token.text))}
+        </code>
       </pre>
       <CopyButton value={code} label="Copy code" className={cx('absolute right-2', label ? 'top-11' : 'top-2')} />
     </div>

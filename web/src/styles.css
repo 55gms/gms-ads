@@ -60,6 +60,7 @@
   --ds-purple-text: #6a1fb5;
   --ds-purple-soft: rgb(121 40 202 / 0.09);
   --ds-purple-border: rgb(121 40 202 / 0.3);
+  --ds-pink-text: #bd2864;
 
   --ds-shadow-popover: 0 4px 8px -4px rgb(0 0 0 / 0.1), 0 16px 24px -8px rgb(0 0 0 / 0.06);
   --ds-shadow-modal: 0 8px 16px -4px rgb(0 0 0 / 0.08), 0 24px 48px -12px rgb(0 0 0 / 0.18);
@@ -119,6 +120,7 @@
   --ds-purple-text: #bf7af0;
   --ds-purple-soft: rgb(142 78 198 / 0.17);
   --ds-purple-border: rgb(142 78 198 / 0.45);
+  --ds-pink-text: #f75f8f;
 
   /* Dark mode leans on the border and a lighter surface instead of shadow. */
   --ds-shadow-popover: 0 0 0 0 transparent;
@@ -180,6 +182,7 @@
   --color-purple-text: var(--ds-purple-text);
   --color-purple-soft: var(--ds-purple-soft);
   --color-purple-border: var(--ds-purple-border);
+  --color-pink-text: var(--ds-pink-text);
 
   --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;

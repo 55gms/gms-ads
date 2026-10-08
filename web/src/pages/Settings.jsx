@@ -411,7 +411,7 @@ export function Ingestion() {
         empty={<EmptyState icon={ServerCog} title="No batches yet" description="The edge sends one at the top of each hour. You can also trigger a flush from the 55GMS server." />}
       />
       <Modal open={Boolean(detail)} onClose={() => setDetail(null)} title="Rejected batch" description={shown ? `Batch ${shown.batch_id} was refused as a whole, so no counts from it were added.` : ''} width="max-w-2xl" footer={<Button onClick={() => setDetail(null)}>Close</Button>}>
-        {shown && <CodeBlock code={JSON.stringify(shown.errors, null, 2)} />}
+        {shown && <CodeBlock lang="json" code={JSON.stringify(shown.errors, null, 2)} />}
       </Modal>
     </>
   );
