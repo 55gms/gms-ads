@@ -102,6 +102,17 @@ export function uuid(body, field, { required = true } = {}) {
   return v;
 }
 
+// Click destinations that stay on whichever site showed the ad, for features
+// like 55gms premium that every site serves at the same path.
+export const SITE_CLICK_PATHS = ['/premium'];
+
+// Click destination: a public https URL or one of SITE_CLICK_PATHS.
+export function clickUrl(body, field) {
+  const raw = body[field];
+  if (typeof raw === 'string' && SITE_CLICK_PATHS.includes(raw.trim())) return raw.trim();
+  return httpsUrl(body, field);
+}
+
 // Public https URL for click destinations. Structure only; no network access.
 export function httpsUrl(body, field, { required = true, allowHttp = false } = {}) {
   const v = str(body, field, { required, max: 2000 });
