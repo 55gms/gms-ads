@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
+import { SITE_CLICK_PATHS } from '../../../shared/validators.js';
 import { api, errorMessage, fieldErrors, patch, post } from '../lib/api.js';
 import { cx } from '../lib/cx.js';
 import { fromLocalInput, sizeLabel, toLocalInput } from '../lib/format.js';
@@ -42,11 +43,13 @@ const fromCampaign = (c) => ({
 function validate(form) {
   const errors = {};
   if (!form.name.trim()) errors.name = 'Give the campaign a name';
-  try {
-    const url = new URL(form.clickUrl);
-    if (url.protocol !== 'https:') errors.clickUrl = 'Must start with https://';
-  } catch {
-    errors.clickUrl = form.clickUrl ? 'Enter a full URL, such as https://example.com/landing' : 'Enter where clicks should go';
+  if (!SITE_CLICK_PATHS.includes(form.clickUrl.trim())) {
+    try {
+      const url = new URL(form.clickUrl);
+      if (url.protocol !== 'https:') errors.clickUrl = 'Must start with https://';
+    } catch {
+      errors.clickUrl = form.clickUrl ? 'Enter a full URL, such as https://example.com/landing, or /premium' : 'Enter where clicks should go';
+    }
   }
   if (form.startsAt && form.endsAt && form.endsAt <= form.startsAt) errors.endsAt = 'End must be after start';
   for (const field of ['totalCap', 'dailyCap']) {
@@ -156,8 +159,8 @@ export function CampaignSheet({ open, campaign, creatives, domains, onClose, onS
           <Field label="Name" error={show('name')}>
             {(props) => <Input {...props} {...input('name')} data-autofocus maxLength={120} placeholder="Autumn sale" />}
           </Field>
-          <Field label="Click URL" hint="Where a click on any creative in this campaign goes." error={show('clickUrl')}>
-            {(props) => <Input {...props} {...input('clickUrl')} type="url" inputMode="url" placeholder="https://example.com/landing" mono />}
+          <Field label="Click URL" hint="Where a click on any creative in this campaign goes. Use /premium to send people to 55gms premium on the site they are on." error={show('clickUrl')}>
+            {(props) => <Input {...props} {...input('clickUrl')} type="text" inputMode="url" placeholder="https://example.com/landing" mono />}
           </Field>
 
           <div className="grid gap-4 sm:grid-cols-2">
