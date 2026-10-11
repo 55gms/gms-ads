@@ -332,8 +332,8 @@ export function Creatives() {
             <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {group.items.map((creative) => (
                 <li key={creative.id} className="group overflow-hidden rounded-md border border-gray-400 ease-hover hover:border-gray-500">
-                  <button type="button" onClick={() => setSearchParams({ preview: creative.id })} aria-label={`Preview ${sizeLabel(creative.size)} creative${creative.alt_text ? `: ${creative.alt_text}` : ''}`} className="grid h-40 w-full place-items-center bg-background-200 p-4">
-                    <img src={creative.image_url} alt="" loading="lazy" className="max-h-full max-w-full object-contain transition-transform duration-[200ms] ease-out group-hover:scale-[1.02]" />
+                  <button type="button" onClick={() => setSearchParams({ preview: creative.id })} aria-label={`Preview ${sizeLabel(creative.size)} creative${creative.alt_text ? `: ${creative.alt_text}` : ''}`} className="flex h-40 w-full items-center justify-center overflow-hidden bg-background-200 p-4">
+                    <img src={creative.image_url} alt="" loading="lazy" className="h-auto max-h-full w-auto max-w-full min-w-0 object-contain transition-transform duration-[200ms] ease-out group-hover:scale-[1.02]" />
                   </button>
                   <div className="flex items-center gap-2 border-t border-gray-400 px-3 py-2">
                     <div className="min-w-0 flex-1">
