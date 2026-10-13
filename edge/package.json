@@ -1,6 +1,6 @@
 {
   "name": "@55gms/ads-edge",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Edge module for the 55GMS ad server: serves ads from a cached manifest and reports hourly stats",
   "type": "module",
   "main": "index.js",
