@@ -28,7 +28,7 @@ function readCampaign(body, partial) {
   const has = (field) => !partial || body[field] !== undefined;
   const out = {};
   if (has('name')) out.name = v.str(body, 'name', { min: 1, max: 120 });
-  if (has('clickUrl')) out.click_url = v.httpsUrl(body, 'clickUrl');
+  if (has('clickUrl')) out.click_url = v.clickUrl(body, 'clickUrl');
   if (has('weight')) out.weight = v.int(body, 'weight', { min: 1, max: 100 });
   if (has('status')) out.status = v.oneOf(body, 'status', STATUSES, { required: partial }) || 'draft';
   if (has('startsAt')) out.starts_at = v.date(body, 'startsAt');

@@ -733,6 +733,7 @@ export function createAdsRouter(options = {}) {
     const countable =
       req.method === 'GET' && !isBot(req) && serve.domain === hostOf(req) && now - serve.at <= CLICK_WINDOW_MS && serve.at - now <= 60_000;
     if (countable && seenClicks.add(token, now)) count('clicks', serve, now);
+    // A path such as /premium is relative, so the browser stays on the site it is on.
     return send(res, 302, undefined, { Location: campaign.clickUrl, 'Referrer-Policy': 'no-referrer' });
   }
 
