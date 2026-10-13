@@ -1,5 +1,7 @@
 // 55GMS ads.js — finds [data-55gms-ad] slots, fills them from the game site's
 // own origin (/_ads/*), and reports viewable impressions. No dependencies.
+// On sites approved for Google the edge says so, and the slots hold AdSense
+// display units instead.
 
 import { pickSizes, parseSize } from './sizes.js';
 
@@ -21,6 +23,7 @@ import { pickSizes, parseSize } from './sizes.js';
   var beaconTimer = 0;
   var slots = []; // every slot we manage
   var viewTimers = typeof WeakMap === 'function' ? new WeakMap() : null;
+  var googleScript = null; // the AdSense loader, added once a slot needs it
 
   if (!viewTimers || !win.IntersectionObserver || !win.fetch) return;
 
@@ -140,6 +143,52 @@ import { pickSizes, parseSize } from './sizes.js';
     viewObserver.observe(el);
   }
 
+  // Sites approved for Google: every slot gets an AdSense display unit at the
+  // size the slot picked. Google draws its own label and counts its own
+  // impressions, so nothing here is observed or reported.
+  function renderGoogle(slot, g) {
+    var el = slot.el;
+    var size = parseSize(slot.sizes[0]);
+    if (!size) return collapse(slot);
+    if (!googleScript) {
+      googleScript = doc.createElement('script');
+      googleScript.async = true;
+      googleScript.crossOrigin = 'anonymous';
+      googleScript.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=' + encodeURIComponent(g.client);
+      // Blocked or offline: free the space every Google slot reserved.
+      googleScript.onerror = function () {
+        slots.forEach(function (s) {
+          if (s.google) collapse(s);
+        });
+      };
+      doc.head.appendChild(googleScript);
+    }
+    slot.google = 1;
+    el.textContent = '';
+    el.removeAttribute('data-serve');
+    el.style.display = 'block';
+    el.style.width = size.width + 'px';
+    el.style.maxWidth = '100%';
+    el.style.minHeight = size.height + 'px';
+    el.style.overflow = 'hidden';
+
+    var ins = doc.createElement('ins');
+    ins.className = 'adsbygoogle';
+    ins.style.cssText = 'display:inline-block;width:' + size.width + 'px;height:' + size.height + 'px';
+    ins.setAttribute('data-ad-client', g.client);
+    ins.setAttribute('data-ad-slot', g.slot);
+    el.appendChild(ins);
+    // Google marks the unit once it knows whether it has an ad for it.
+    new MutationObserver(function () {
+      if (ins.getAttribute('data-ad-status') === 'unfilled') collapse(slot);
+    }).observe(ins, { attributes: true, attributeFilter: ['data-ad-status'] });
+    try {
+      (win.adsbygoogle = win.adsbygoogle || []).push({});
+    } catch (_e) {
+      collapse(slot);
+    }
+  }
+
   function requestAds() {
     serveTimer = 0;
     var batch = pending.splice(0, 12);
@@ -154,8 +203,10 @@ import { pickSizes, parseSize } from './sizes.js';
       })
       .then(function (data) {
         var ads = (data && data.ads) || [];
+        var google = data && data.google;
         batch.forEach(function (slot, i) {
-          if (ads[i] && ads[i].serveId) render(slot, ads[i]);
+          if (google && google.client && google.slot) renderGoogle(slot, google);
+          else if (ads[i] && ads[i].serveId) render(slot, ads[i]);
           else collapse(slot);
         });
       })
@@ -236,7 +287,9 @@ import { pickSizes, parseSize } from './sizes.js';
       return slot.el.isConnected;
     });
     slots.forEach(function (slot) {
-      if (slot.el.getAttribute('data-size')) return;
+      // A Google unit keeps the size it was requested at; re-requesting on
+      // resize would refresh the ad.
+      if (slot.el.getAttribute('data-size') || slot.google) return;
       // Measure against the parent: the slot itself is sized to the current ad.
       var hidden = slot.el.style.display === 'none';
       var width = slot.el.style.width;
