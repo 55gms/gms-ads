@@ -10,6 +10,7 @@ import { errorHandler, notFound } from './middleware/errors.js';
 import { adminRouter } from './routes/admin/index.js';
 import { mediaRouter } from './routes/media.js';
 import { v1Router } from './routes/v1.js';
+import { videoRouter } from './routes/video.js';
 
 const spaDir = path.join(rootDir, 'web/dist');
 
@@ -31,8 +32,11 @@ export function createApp() {
           styleSrc: ["'self'"],
           styleSrcAttr: ["'unsafe-inline'"],
           imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+          // Video previews come from the Bunny CDN or an allowlisted host.
+          mediaSrc: ["'self'", 'blob:', 'https:'],
           fontSrc: ["'self'"],
-          connectSrc: ["'self'"],
+          // Video uploads go from the browser straight to Bunny over TUS.
+          connectSrc: ["'self'", 'https://video.bunnycdn.com'],
           objectSrc: ["'none'"],
           baseUri: ["'self'"],
           formAction: ["'self'"],
@@ -56,6 +60,7 @@ export function createApp() {
 
   app.use('/media', mediaRouter);
   app.use('/api/v1', v1Router);
+  app.use('/api/v1', videoRouter);
 
   app.use(cookies);
   app.use('/auth', authRouter);

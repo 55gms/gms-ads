@@ -53,7 +53,8 @@ export async function createFromExternal({ url, sizeId, altText, campaignId, use
 
 // Removes the row, then the file only when no other creative shares its hash.
 export async function deleteCreative(id) {
-  const { rows } = await query('DELETE FROM creatives WHERE id = $1 RETURNING *', [id]);
+  // Videos are removed through /videos so their Bunny copy goes too.
+  const { rows } = await query("DELETE FROM creatives WHERE id = $1 AND kind = 'image' RETURNING *", [id]);
   const creative = rows[0];
   if (!creative) return null;
   if (creative.source === 'upload' && creative.sha256) {

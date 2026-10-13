@@ -8,8 +8,11 @@ import { adminLimiter } from '../../middleware/rateLimit.js';
 import { campaignsRouter } from './campaigns.js';
 import { creativesRouter } from './creatives.js';
 import { domainsRouter } from './domains.js';
+import { providersRouter } from './providers.js';
 import { settingsRouter } from './settings.js';
 import { statsRouter } from './stats.js';
+import { videoStatsRouter } from './videoStats.js';
+import { videosRouter } from './videos.js';
 
 export const adminRouter = Router();
 
@@ -25,6 +28,13 @@ adminRouter.get('/me', (req, res) => {
       embed: config.embed,
       externalImageHosts: config.externalImageHosts,
       maxUploadBytes: config.maxUploadBytes,
+      video: {
+        enabled: config.video.enabled,
+        bunny: Boolean(config.bunny.libraryId && config.bunny.apiKey && config.bunny.cdnHost),
+        maxUploadBytes: config.video.maxUploadBytes,
+        maxDurationSeconds: config.video.maxDurationSeconds,
+        externalHosts: config.video.externalHosts,
+      },
     },
   });
 });
@@ -43,7 +53,7 @@ adminRouter.get(
       query('SELECT id, name, status FROM campaigns WHERE lower(name) LIKE $1 ORDER BY updated_at DESC LIMIT 6', [like]),
       query(
         `SELECT cr.id, cr.alt_text, s.width, s.height FROM creatives cr JOIN ad_sizes s ON s.id = cr.size_id
-          WHERE cr.status = 'active' AND (lower(cr.alt_text) LIKE $1 OR (s.width || 'x' || s.height) LIKE $1)
+          WHERE cr.status = 'active' AND cr.kind = 'image' AND (lower(cr.alt_text) LIKE $1 OR (s.width || 'x' || s.height) LIKE $1)
           ORDER BY cr.created_at DESC LIMIT 6`,
         [like]
       ),
@@ -56,5 +66,8 @@ adminRouter.get(
 adminRouter.use('/campaigns', campaignsRouter);
 adminRouter.use('/creatives', creativesRouter);
 adminRouter.use('/domains', domainsRouter);
+adminRouter.use('/videos', videosRouter);
+adminRouter.use('/providers', providersRouter);
+adminRouter.use('/stats/video', videoStatsRouter);
 adminRouter.use('/stats', statsRouter);
 adminRouter.use('/settings', settingsRouter);

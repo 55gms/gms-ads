@@ -28,21 +28,23 @@ export async function buildManifest({ siteKey, instances = 1 }) {
   const [campaigns, creatives, targets, usage, domains] = await Promise.all([
     query(
       `SELECT id, name, weight, starts_at, ends_at, click_url, targeting_mode, total_impression_cap, daily_impression_cap
-         FROM campaigns WHERE status = 'active' AND (ends_at IS NULL OR ends_at > now()) ORDER BY id`
+         FROM campaigns WHERE status = 'active' AND (ends_at IS NULL OR ends_at > now()) AND 'banner' = ANY(formats) ORDER BY id`
     ),
     query(
       `SELECT cr.*, s.width AS size_width, s.height AS size_height
          FROM creatives cr JOIN ad_sizes s ON s.id = cr.size_id JOIN campaigns c ON c.id = cr.campaign_id
-        WHERE cr.status = 'active' AND c.status = 'active' ORDER BY cr.id`
+        WHERE cr.status = 'active' AND cr.kind = 'image' AND c.status = 'active' ORDER BY cr.id`
     ),
     query(
       `SELECT cd.campaign_id, d.hostname FROM campaign_domains cd JOIN domains d ON d.id = cd.domain_id
         ORDER BY cd.campaign_id, d.hostname`
     ),
     query(
-      `SELECT s.campaign_id, sum(s.impressions) AS total,
-              sum(s.impressions) FILTER (WHERE s.hour >= date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS today
-         FROM stats_hourly s JOIN campaigns c ON c.id = s.campaign_id
+      `SELECT s.campaign_id, sum(s.n) AS total,
+              sum(s.n) FILTER (WHERE s.hour >= date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC') AS today
+         FROM (SELECT campaign_id, hour, impressions AS n FROM stats_hourly
+               UNION ALL SELECT campaign_id, hour, starts AS n FROM video_stats_hourly WHERE campaign_id IS NOT NULL) s
+         JOIN campaigns c ON c.id = s.campaign_id
         WHERE c.status = 'active' AND (c.total_impression_cap IS NOT NULL OR c.daily_impression_cap IS NOT NULL)
         GROUP BY s.campaign_id`
     ),

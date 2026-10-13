@@ -39,7 +39,7 @@ export const creativesRouter = Router();
 creativesRouter.get(
   '/',
   asyncHandler(async (_req, res) => {
-    const { rows } = await query(`${SELECT} WHERE cr.status = 'active' ORDER BY s.width DESC, s.height DESC, cr.created_at DESC`);
+    const { rows } = await query(`${SELECT} WHERE cr.status = 'active' AND cr.kind = 'image' ORDER BY s.width DESC, s.height DESC, cr.created_at DESC`);
     res.json({ creatives: rows.map(present) });
   })
 );
@@ -94,7 +94,7 @@ creativesRouter.patch(
       sets.push(`campaign_id = $${params.length}`);
     }
     if (!sets.length) throw new HttpError(400, 'empty', 'Nothing to update');
-    const { rows } = await query(`UPDATE creatives SET ${sets.join(', ')} WHERE id = $1 RETURNING id`, params);
+    const { rows } = await query(`UPDATE creatives SET ${sets.join(', ')} WHERE id = $1 AND kind = 'image' RETURNING id`, params);
     if (!rows[0]) throw new HttpError(404, 'not_found', 'Creative not found');
     audit(req, 'creative.updated', 'creative', rows[0].id);
     res.json({ creative: await one(rows[0].id) });

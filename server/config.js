@@ -57,6 +57,33 @@ export const config = {
     version: env.EMBED_VERSION || '',
     sri: env.EMBED_SRI || '',
   },
+  video: {
+    // Kill switch for every video and rewarded route. Image ads never depend on it.
+    enabled: env.VIDEO_ENABLED !== 'false',
+    maxUploadBytes: Number(env.VIDEO_MAX_UPLOAD_BYTES || 500 * 1024 * 1024),
+    maxDurationSeconds: Number(env.VIDEO_MAX_DURATION_SECONDS || 120),
+    externalHosts: env.EXTERNAL_VIDEO_HOSTS === undefined ? ['cdn.jsdelivr.net'] : list(env.EXTERNAL_VIDEO_HOSTS),
+    sessionTtlSeconds: Number(env.REWARD_SESSION_TTL_SECONDS || 15 * 60),
+    // Open sessions one viewer may hold at once, across tabs.
+    maxOpenSessions: Number(env.REWARD_MAX_OPEN_SESSIONS || 4),
+    maxSessionsPerHour: Number(env.REWARD_MAX_SESSIONS_PER_HOUR || 60),
+    maxGrantsPerHour: Number(env.REWARD_MAX_GRANTS_PER_HOUR || 30),
+    playbackTokenTtlSeconds: Number(env.PLAYBACK_TOKEN_TTL_SECONDS || 2 * 60 * 60),
+  },
+  bunny: {
+    libraryId: env.BUNNY_STREAM_LIBRARY_ID || '',
+    apiKey: env.BUNNY_STREAM_API_KEY || '',
+    // Pull zone host of the library, e.g. vz-abc123-456.b-cdn.net.
+    cdnHost: (env.BUNNY_STREAM_CDN_HOST || '').replace(/^https?:\/\//, '').replace(/\/+$/, ''),
+    // CDN token authentication key; when set, playback URLs are signed.
+    tokenKey: env.BUNNY_STREAM_TOKEN_KEY || '',
+    // The library's read-only API key: Bunny signs webhooks with it.
+    webhookKey: env.BUNNY_STREAM_WEBHOOK_KEY || '',
+    collectionId: env.BUNNY_STREAM_COLLECTION_ID || '',
+    apiBase: env.BUNNY_STREAM_API_BASE || 'https://video.bunnycdn.com',
+  },
+  // Signs reward grants so a game backend can check one without a database call.
+  keysReward: derive('reward'),
 };
 
 // Fall back to the committed build manifest when the env vars are not set.

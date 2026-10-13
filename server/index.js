@@ -5,6 +5,8 @@ import { migrate } from './db/migrate.js';
 import { pool } from './db/pool.js';
 import { logger } from './logger.js';
 import { pruneIngestBatches } from './services/ingest.js';
+import { startVideoPoller, stopVideoPoller } from './services/video/assets.js';
+import { pruneSessions } from './services/video/sessions.js';
 
 async function main() {
   // Migrations run on boot so a deploy never serves against an old schema.
@@ -16,12 +18,14 @@ async function main() {
   server.keepAliveTimeout = 65_000;
 
   const housekeeping = () =>
-    Promise.all([pruneIngestBatches(), pruneRefreshTokens(), pool.query("DELETE FROM edge_instances WHERE last_seen_at < now() - interval '1 day'")]).catch((err) =>
+    Promise.all([pruneIngestBatches(), pruneRefreshTokens(), pruneSessions(), pool.query("DELETE FROM edge_instances WHERE last_seen_at < now() - interval '1 day'")]).catch((err) =>
       logger.error('housekeeping failed', { error: err.message })
     );
   housekeeping();
   const timer = setInterval(housekeeping, 6 * 60 * 60 * 1000);
   timer.unref();
+  // Catches Bunny processing changes even when no webhook arrives.
+  startVideoPoller();
 
   let stopping = false;
   const shutdown = (signal) => {
@@ -29,6 +33,7 @@ async function main() {
     stopping = true;
     logger.info('shutting down', { signal });
     clearInterval(timer);
+    stopVideoPoller();
     // Stop accepting connections, let in-flight requests finish, then close the pool.
     server.close(async () => {
       await pool.end().catch(() => {});
