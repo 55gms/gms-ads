@@ -174,13 +174,21 @@ import { pickSizes, parseSize } from './sizes.js';
 
     var ins = doc.createElement('ins');
     ins.className = 'adsbygoogle';
-    ins.style.cssText = 'display:inline-block;width:' + size.width + 'px;height:' + size.height + 'px';
+    // Unseen until Google has an ad: its empty frame is a white box.
+    ins.style.cssText = 'display:inline-block;opacity:0;width:' + size.width + 'px;height:' + size.height + 'px';
     ins.setAttribute('data-ad-client', g.client);
     ins.setAttribute('data-ad-slot', g.slot);
     el.appendChild(ins);
-    // Google marks the unit once it knows whether it has an ad for it.
+    // Google marks the unit once it knows whether it has an ad for it. A unit
+    // it leaves empty goes to a campaign instead.
     new MutationObserver(function () {
-      if (ins.getAttribute('data-ad-status') === 'unfilled') collapse(slot);
+      var status = ins.getAttribute('data-ad-status');
+      if (status === 'filled') ins.style.opacity = '';
+      if (status !== 'unfilled' || !slot.google) return;
+      slot.google = 0;
+      slot.fallback = 1;
+      el.textContent = '';
+      enqueue(slot);
     }).observe(ins, { attributes: true, attributeFilter: ['data-ad-status'] });
     try {
       (win.adsbygoogle = win.adsbygoogle || []).push({});
@@ -191,13 +199,21 @@ import { pickSizes, parseSize } from './sizes.js';
 
   function requestAds() {
     serveTimer = 0;
-    var batch = pending.splice(0, 12);
+    if (!pending.length) return;
+    // Slots Google left empty ask in a request of their own, marked so the
+    // edge answers with campaigns.
+    var fallback = pending[0].fallback;
+    var batch = [];
+    pending = pending.filter(function (slot) {
+      if (batch.length === 12 || slot.fallback !== fallback) return true;
+      batch.push(slot);
+      return false;
+    });
     if (pending.length) serveTimer = setTimeout(requestAds, 0);
-    if (!batch.length) return;
     var groups = batch.map(function (slot) {
       return slot.sizes.join(',');
     });
-    fetch(base + '/serve?slots=' + encodeURIComponent(groups.join(';')), { credentials: 'omit' })
+    fetch(base + '/serve?slots=' + encodeURIComponent(groups.join(';')) + (fallback ? '&fallback=1' : ''), { credentials: 'omit' })
       .then(function (res) {
         return res.ok && res.status !== 204 ? res.json() : { ads: [] };
       })
@@ -205,7 +221,7 @@ import { pickSizes, parseSize } from './sizes.js';
         var ads = (data && data.ads) || [];
         var google = data && data.google;
         batch.forEach(function (slot, i) {
-          if (google && google.client && google.slot) renderGoogle(slot, google);
+          if (google && google.client && google.slot && !fallback) renderGoogle(slot, google);
           else if (ads[i] && ads[i].serveId) render(slot, ads[i]);
           else collapse(slot);
         });
