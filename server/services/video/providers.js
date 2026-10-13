@@ -27,7 +27,8 @@ export const CAPABILITIES = {
     serverVerifiedReward: false,
     reliableCompletion: true,
     configurableSkip: false,
-    note: 'Ad Placement API (adBreak). Needs an approved AdSense account for H5 Games. Interstitials only at natural breaks; Google decides skipping and frequency. Rewards rely on adViewed in the browser, which cannot be verified server-side.',
+    display: true,
+    note: 'Runs only on the sites listed here. With a display slot set, Google fills every banner slot on those sites instead of campaigns. Video uses the Ad Placement API (adBreak), which needs separate H5 Games Ads approval: interstitials only at natural breaks, Google decides skipping and frequency, and rewards rely on adViewed in the browser, which cannot be verified server-side.',
   },
   vast: {
     formats: ['video_embedded', 'video_fullscreen', 'video_rewarded'],
@@ -40,6 +41,22 @@ export const CAPABILITIES = {
   },
 };
 
+const MAX_PROVIDER_DOMAINS = 200;
+
+// Accepts an array or pasted text, one hostname pattern per line or comma.
+function readDomains(raw) {
+  const parts = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(/[\s,]+/) : [];
+  const out = [];
+  for (const part of parts) {
+    if (part === '') continue;
+    const host = v.cleanHostname(part);
+    if (!host) v.fail('domains', `Not a hostname: ${String(part).slice(0, 60)}`);
+    if (!out.includes(host)) out.push(host);
+  }
+  if (out.length > MAX_PROVIDER_DOMAINS) v.fail('domains', `At most ${MAX_PROVIDER_DOMAINS} sites`);
+  return out;
+}
+
 function readConfig(type, raw = {}) {
   if (type === 'google_h5') {
     const client = v.str(raw, 'client', { required: false, max: 40 });
@@ -48,7 +65,9 @@ function readConfig(type, raw = {}) {
     if (!/^\d{1,4}s$/.test(frequencyHint)) v.fail('frequencyHint', 'Use seconds, such as 30s');
     const channel = v.str(raw, 'channel', { required: false, max: 20 });
     if (channel && !/^\d+$/.test(channel)) v.fail('channel', 'Channel IDs are numbers');
-    return { client, testMode: raw.testMode !== false, frequencyHint, channel };
+    const displaySlot = v.str(raw, 'displaySlot', { required: false, max: 20 });
+    if (displaySlot && !/^\d{6,20}$/.test(displaySlot)) v.fail('displaySlot', 'Use the data-ad-slot number from the AdSense unit');
+    return { client, testMode: raw.testMode !== false, frequencyHint, channel, displaySlot, domains: readDomains(raw.domains) };
   }
   if (type === 'vast') {
     const tagUrl = v.httpsUrl(raw, 'tagUrl', { required: false });
@@ -107,4 +126,12 @@ export async function updateProvider(id, body) {
 export async function publicProviderConfig() {
   const { rows } = await query("SELECT id, type, formats, priority, config FROM ad_providers WHERE enabled AND status = 'ok' ORDER BY priority, id");
   return rows.map((r) => ({ id: r.id, type: r.type, formats: r.formats, priority: r.priority, config: r.config }));
+}
+
+// The display unit the edge hands to ads.js on approved sites, or null.
+export async function googleDisplayConfig() {
+  const { rows } = await query("SELECT config FROM ad_providers WHERE type = 'google_h5' AND enabled AND status = 'ok' ORDER BY priority, id LIMIT 1");
+  const cfg = rows[0]?.config;
+  if (!cfg?.client || !cfg.displaySlot || !cfg.domains?.length) return null;
+  return { client: cfg.client, slot: cfg.displaySlot, domains: cfg.domains };
 }

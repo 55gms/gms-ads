@@ -4,6 +4,7 @@
 import crypto from 'node:crypto';
 import { query } from '../db/pool.js';
 import { imageUrlFor } from './creatives.js';
+import { googleDisplayConfig } from './video/providers.js';
 
 const INSTANCE_WINDOW = '5 minutes';
 
@@ -25,7 +26,7 @@ export async function touchInstance(siteKeyId, instanceId) {
 }
 
 export async function buildManifest({ siteKey, instances = 1 }) {
-  const [campaigns, creatives, targets, usage, domains] = await Promise.all([
+  const [campaigns, creatives, targets, usage, domains, google] = await Promise.all([
     query(
       `SELECT id, name, weight, starts_at, ends_at, click_url, targeting_mode, total_impression_cap, daily_impression_cap
          FROM campaigns WHERE status = 'active' AND (ends_at IS NULL OR ends_at > now()) AND 'banner' = ANY(formats) ORDER BY id`
@@ -49,6 +50,7 @@ export async function buildManifest({ siteKey, instances = 1 }) {
         GROUP BY s.campaign_id`
     ),
     query('SELECT hostname FROM domains WHERE NOT enabled ORDER BY hostname'),
+    googleDisplayConfig(),
   ]);
 
   const used = new Map(usage.rows.map((r) => [r.campaign_id, r]));
@@ -62,6 +64,8 @@ export async function buildManifest({ siteKey, instances = 1 }) {
     blockedDomains: domains.rows.map((d) => d.hostname),
     // Patterns this API key is limited to; null means any host.
     allowedDomains: allowed && allowed.length ? allowed : null,
+    // On these hosts Google fills every banner slot and campaigns do not serve.
+    google,
     campaigns: campaigns.rows
       .map((c) => ({
         id: c.id,

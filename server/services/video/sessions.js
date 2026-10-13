@@ -160,8 +160,17 @@ async function checkViewerLimits(viewerKey, format) {
   if (rows[0].open >= config.video.maxOpenSessions) throw new HttpError(429, 'too_many_open', 'Finish or close the ads already open first.');
 }
 
-function enabledProviders(snapshot, format) {
-  return snapshot.providers.filter((p) => p.enabled && p.status === 'ok' && p.formats.includes(format) && p.type !== 'first_party');
+// Google may only run on sites its AdSense account is approved for, so an
+// empty list means nowhere. Other providers are not tied to a site.
+function providerServesDomain(provider, domain) {
+  if (provider.type !== 'google_h5') return true;
+  return hostMatchesAny(provider.config?.domains || [], domain);
+}
+
+function enabledProviders(snapshot, format, domain) {
+  return snapshot.providers.filter(
+    (p) => p.enabled && p.status === 'ok' && p.formats.includes(format) && p.type !== 'first_party' && providerServesDomain(p, domain)
+  );
 }
 
 const newToken = () => crypto.randomBytes(32).toString('base64url');
@@ -206,7 +215,7 @@ export async function availability(body, siteKey) {
     return { available: false, firstParty: false, providers: [] };
   }
   const firstParty = Boolean(selectVideo(snapshot.campaigns, { format, domain, remaining: remainingFor(snapshot) }));
-  const providers = enabledProviders(snapshot, format).map((p) => p.id);
+  const providers = enabledProviders(snapshot, format, domain).map((p) => p.id);
   return { available: firstParty || providers.length > 0, firstParty, providers };
 }
 
@@ -220,7 +229,7 @@ export async function createSession(body, siteKey) {
 
   if (req.provider !== 'auto') {
     // A provider-backed session only records what the provider reports.
-    const provider = enabledProviders(snapshot, req.format).find((p) => p.id === req.provider);
+    const provider = enabledProviders(snapshot, req.format, req.domain).find((p) => p.id === req.provider);
     if (!provider) throw new HttpError(409, 'provider_unavailable', 'That provider is not enabled for this format');
     return tx(async (db) => {
       const { token, session } = await insertSession(db, { ...req, siteKeyId: siteKey.id });
@@ -232,7 +241,7 @@ export async function createSession(body, siteKey) {
   const pick = selectVideo(snapshot.campaigns, { format: req.format, domain: req.domain, remaining: remainingFor(snapshot) });
   if (!pick) {
     await bumpStats({ query }, statKey, ['requests']);
-    return { fill: false, reason: 'no_fill', fallbacks: enabledProviders(snapshot, req.format).map((p) => p.id) };
+    return { fill: false, reason: 'no_fill', fallbacks: enabledProviders(snapshot, req.format, req.domain).map((p) => p.id) };
   }
 
   const { campaign, creative } = pick;
