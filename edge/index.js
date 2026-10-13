@@ -125,6 +125,7 @@ export function createAdsRouter(options = {}) {
   let byCampaign = new Map();
   let blocked = []; // hostname patterns switched off on the ad server
   let allowed = null; // hostname patterns this API key is limited to; null means any host
+  let google = null; // { client, slot, domains }: hosts where Google fills the banner slots
   let mediaNames = new Set(); // uploaded creative files named by the current manifest
   const mediaCache = new Map(); // "name|variant" -> Promise<{ body, type, etag } | null>
   const seenDomains = new Set(); // hosts served since the last sealed batch, bounded by maxDomains
@@ -147,6 +148,7 @@ export function createAdsRouter(options = {}) {
     startedAt: new Date(opts.now()).toISOString(),
     serves: 0,
     noFill: 0,
+    google: 0,
     impressions: 0,
     clicks: 0,
     rejectedTokens: 0,
@@ -394,6 +396,7 @@ export function createAdsRouter(options = {}) {
         byCampaign = new Map(data.campaigns.map((c) => [c.id, c]));
         blocked = Array.isArray(data.blockedDomains) ? data.blockedDomains : [];
         allowed = Array.isArray(data.allowedDomains) ? data.allowedDomains : null;
+        google = data.google?.client && data.google.slot && Array.isArray(data.google.domains) ? data.google : null;
         mediaNames = new Set();
         for (const campaign of data.campaigns) {
           for (const creative of campaign.creatives || []) {
@@ -683,6 +686,12 @@ export function createAdsRouter(options = {}) {
     const domain = hostOf(req);
     // Any real hostname is served unless it was switched off on the ad server.
     if (!canServe(domain)) return single ? send(res, 204) : send(res, 200, { ads: groups.map(() => null) });
+    // On sites approved for Google, ads.js renders an AdSense unit in every
+    // slot and campaigns stay out. The single-ad form has no way to say so.
+    if (google && hostMatchesAny(google.domains, domain)) {
+      stats.google += groups.length;
+      return single ? send(res, 204) : send(res, 200, { ads: groups.map(() => null), google: { client: google.client, slot: google.slot } });
+    }
     const used = new Set();
     const ads = groups.map((group) => {
       const sizes = parseSizes(group);

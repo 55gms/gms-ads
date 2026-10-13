@@ -18,7 +18,7 @@ app.use('/_ads', ads);
 | Route | Purpose |
 |---|---|
 | `GET /serve?sizes=728x90,468x60` | One ad for the request's `Host`, or 204 |
-| `GET /serve?slots=728x90,468x60;300x250` | Several slots in one call: `{ ads: [ad or null, ...] }`. Used by `ads.js` |
+| `GET /serve?slots=728x90,468x60;300x250` | Several slots in one call: `{ ads: [ad or null, ...] }`. Used by `ads.js`. On a host listed under the Google provider the reply is `{ ads: [null, ...], google: { client, slot } }` and `ads.js` renders an AdSense unit in each slot |
 | `POST /i` | Body `{ serveId }` or `{ serveIds: [...] }`. Counts once per serve, within 10 minutes |
 | `GET /c/:serveId` | Counts the click once and redirects to the campaign's click URL |
 | `GET /m/:file` | An uploaded creative image named by the current manifest, cached from the ad server. Ads point here instead of at the ad server |
