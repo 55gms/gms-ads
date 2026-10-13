@@ -12,6 +12,7 @@ import { Checkbox } from '../ui/Controls.jsx';
 import { Field, Input, Select } from '../ui/Field.jsx';
 import { EmptyState, PageHeader } from '../ui/Misc.jsx';
 import { ConfirmModal, Modal } from '../ui/Overlay.jsx';
+import { LibraryTabs } from './Videos.jsx';
 
 const ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,image/avif';
 
@@ -314,6 +315,7 @@ export function Creatives() {
           )
         }
       />
+      <LibraryTabs active="images" />
       {canWrite && <Uploader sizes={sizes} maxBytes={config.maxUploadBytes} onUploaded={() => revalidator.revalidate()} />}
 
       {groups.length === 0 ? (

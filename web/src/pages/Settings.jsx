@@ -17,6 +17,7 @@ const SECTIONS = [
   { to: 'members', label: 'Members' },
   { to: 'sizes', label: 'Ad sizes' },
   { to: 'keys', label: 'API keys' },
+  { to: 'providers', label: 'Ad providers' },
   { to: 'ingestion', label: 'Ingestion' },
   { to: 'audit', label: 'Audit log' },
 ];
@@ -30,7 +31,7 @@ export const auditLoader = ({ request }) => get(api('/settings/audit'), { page: 
 export function Settings() {
   return (
     <>
-      <PageHeader title="Settings" description="Team access, ad sizes, edge credentials, and the record of what changed." />
+      <PageHeader title="Settings" description="Team access, ad sizes, edge credentials, ad providers, and the record of what changed." />
       <div className="grid gap-6 md:grid-cols-[200px_minmax(0,1fr)] md:gap-10">
         <nav aria-label="Settings sections" className="edge-fade -mx-4 flex gap-1 overflow-x-auto px-4 [scrollbar-width:none] md:mx-0 md:flex-col md:overflow-visible md:px-0 md:[mask-image:none]">
           {SECTIONS.map((section) => (

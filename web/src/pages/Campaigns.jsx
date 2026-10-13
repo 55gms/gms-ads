@@ -3,11 +3,11 @@ import { useMemo, useState } from 'react';
 import { useLoaderData, useNavigation, useRevalidator, useSearchParams } from 'react-router';
 import { expectedShares } from '../../../edge/lib/selection.js';
 import { api, del, errorMessage, get, patch, post } from '../lib/api.js';
-import { campaignState, scheduleLabel } from '../lib/campaign.js';
+import { FORMAT_LABELS, campaignState, scheduleLabel } from '../lib/campaign.js';
 import { ctr, num, pct, shortDate, sizeLabel } from '../lib/format.js';
 import { useCanWrite } from '../lib/session.js';
 import { toast } from '../lib/stores.js';
-import { StatusDot } from '../ui/Badge.jsx';
+import { Badge, StatusDot } from '../ui/Badge.jsx';
 import { Button, IconButton } from '../ui/Button.jsx';
 import { Menu, Tooltip } from '../ui/Floating.jsx';
 import { Card, EmptyState, PageHeader, Progress } from '../ui/Misc.jsx';
@@ -16,8 +16,14 @@ import { Table } from '../ui/Table.jsx';
 import { CampaignSheet } from './CampaignSheet.jsx';
 
 export async function campaignsLoader() {
-  const [campaigns, creatives, domains] = await Promise.all([get(api('/campaigns')), get(api('/creatives')), get(api('/domains/all'))]);
-  return { campaigns: campaigns.campaigns, creatives: creatives.creatives, domains: domains.domains };
+  const [campaigns, creatives, domains, videos] = await Promise.all([
+    get(api('/campaigns')),
+    get(api('/creatives')),
+    get(api('/domains/all')),
+    // Video can be switched off on the server; image campaigns work either way.
+    get(api('/videos')).catch(() => ({ videos: [] })),
+  ]);
+  return { campaigns: campaigns.campaigns, creatives: creatives.creatives, domains: domains.domains, videos: videos.videos };
 }
 
 function Caps({ campaign }) {
@@ -48,8 +54,8 @@ function Caps({ campaign }) {
 // Expected split of traffic per size among campaigns that are running now,
 // from their weights. Targeting and caps shift the real numbers.
 function Shares({ campaigns }) {
-  const running = campaigns.filter((c) => campaignState(c) === 'active' && c.creatives.length);
-  const sizes = [...new Set(running.flatMap((c) => c.creatives.map((cr) => cr.size)))].sort((a, b) => parseInt(b, 10) - parseInt(a, 10));
+  const running = campaigns.filter((c) => campaignState(c) === 'active' && c.formats.includes('banner') && c.creatives.some((cr) => cr.kind !== 'video'));
+  const sizes = [...new Set(running.flatMap((c) => c.creatives.filter((cr) => cr.kind !== 'video').map((cr) => cr.size)))].sort((a, b) => parseInt(b, 10) - parseInt(a, 10));
   if (!sizes.length) return null;
   const names = new Map(running.map((c) => [c.id, c.name]));
   return (
@@ -171,6 +177,19 @@ export function Campaigns() {
         </div>
       ),
     },
+    {
+      key: 'formats',
+      header: 'Formats',
+      render: (c) => (
+        <span className="flex flex-wrap gap-1">
+          {c.formats.map((f) => (
+            <Badge key={f} tone={f === 'video_rewarded' ? 'purple' : f === 'banner' ? 'gray' : 'blue'}>
+              {FORMAT_LABELS[f]}
+            </Badge>
+          ))}
+        </span>
+      ),
+    },
     { key: 'weight', header: 'Weight', align: 'right', render: (c) => c.weight },
     { key: 'schedule', header: 'Schedule', render: (c) => <span className="whitespace-nowrap">{scheduleLabel(c, shortDate)}</span> },
     { key: 'caps', header: 'Caps', wide: true, render: (c) => <Caps campaign={c} /> },
@@ -220,6 +239,7 @@ export function Campaigns() {
         open={sheetOpen}
         campaign={held.campaign}
         creatives={data.creatives}
+        videos={data.videos}
         domains={data.domains}
         onClose={closeSheet}
         onSaved={async (saved, created) => {

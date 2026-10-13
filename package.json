@@ -37,6 +37,7 @@
     "eslint-plugin-react-refresh": "^0.5.7",
     "geist": "^1.7.2",
     "globals": "^17.13.0",
+    "hls.js": "^1.5.20",
     "lucide-react": "^1.52.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

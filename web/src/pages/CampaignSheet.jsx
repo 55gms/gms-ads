@@ -3,11 +3,12 @@ import { Link } from 'react-router';
 import { api, errorMessage, fieldErrors, patch, post } from '../lib/api.js';
 import { cx } from '../lib/cx.js';
 import { fromLocalInput, sizeLabel, toLocalInput } from '../lib/format.js';
+import { FORMAT_LABELS } from '../lib/campaign.js';
 import { useLocalDraft } from '../lib/hooks.js';
 import { toast } from '../lib/stores.js';
 import { Button } from '../ui/Button.jsx';
 import { Combobox } from '../ui/Combobox.jsx';
-import { RadioGroup, Slider } from '../ui/Controls.jsx';
+import { Checkbox, RadioGroup, Slider } from '../ui/Controls.jsx';
 import { Field, Input, Select } from '../ui/Field.jsx';
 import { Modal, Sheet } from '../ui/Overlay.jsx';
 
@@ -23,7 +24,13 @@ const EMPTY = {
   targetingMode: 'all',
   domainIds: [],
   creativeIds: [],
+  formats: ['banner'],
+  skipAfter: '5',
+  rewardWatchPercent: 100,
+  premiumSkip: '5',
 };
+
+const VIDEO_FORMATS = ['video_embedded', 'video_fullscreen', 'video_rewarded'];
 
 const fromCampaign = (c) => ({
   name: c.name,
@@ -37,6 +44,10 @@ const fromCampaign = (c) => ({
   targetingMode: c.targeting_mode,
   domainIds: c.domain_ids || [],
   creativeIds: c.creatives.map((cr) => cr.id),
+  formats: c.formats || ['banner'],
+  skipAfter: c.skip_after_seconds == null ? '' : String(c.skip_after_seconds),
+  rewardWatchPercent: c.reward_watch_percent ?? 100,
+  premiumSkip: c.premium_skip_seconds == null ? '' : String(c.premium_skip_seconds),
 });
 
 function validate(form) {
@@ -56,13 +67,17 @@ function validate(form) {
     errors.dailyCap = 'Daily cap cannot exceed the total cap';
   }
   if (form.targetingMode !== 'all' && form.domainIds.length === 0) errors.domainIds = 'Pick at least one domain';
+  if (!form.formats.length) errors.formats = 'Pick at least one format';
+  for (const field of ['skipAfter', 'premiumSkip']) {
+    if (form[field] !== '' && !(/^\d{1,2}$/.test(form[field]) && Number(form[field]) <= 60)) errors[field] = 'Enter 0 to 60 seconds, or leave empty';
+  }
   return errors;
 }
 
 // API field names mapped back to this form's field names.
-const SERVER_FIELDS = { totalImpressionCap: 'totalCap', dailyImpressionCap: 'dailyCap' };
+const SERVER_FIELDS = { totalImpressionCap: 'totalCap', dailyImpressionCap: 'dailyCap', skipAfterSeconds: 'skipAfter', premiumSkipSeconds: 'premiumSkip' };
 
-export function CampaignSheet({ open, campaign, creatives, domains, onClose, onSaved }) {
+export function CampaignSheet({ open, campaign, creatives, videos = [], domains, onClose, onSaved }) {
   const baseline = useMemo(() => (campaign ? fromCampaign(campaign) : EMPTY), [campaign]);
   // Autosaved locally so a closed tab or accidental navigation loses nothing.
   const [form, setForm, clearDraft] = useLocalDraft(`campaign-draft:${campaign?.id || 'new'}`, baseline);
@@ -94,6 +109,11 @@ export function CampaignSheet({ open, campaign, creatives, domains, onClose, onS
     return [...groups].sort((a, b) => parseInt(b[0], 10) - parseInt(a[0], 10));
   }, [creatives, campaign]);
 
+  // Videos this campaign can use: its own plus unattached ones not archived.
+  const usableVideos = useMemo(() => videos.filter((v) => v.status !== 'archived' && v.status !== 'failed' && (!v.campaign_id || v.campaign_id === campaign?.id)), [videos, campaign]);
+  const hasVideo = form.formats.some((f) => VIDEO_FORMATS.includes(f));
+  const toggleFormat = (f) => set('formats')(form.formats.includes(f) ? form.formats.filter((x) => x !== f) : [...form.formats, f]);
+
   const toggleCreative = (id) => set('creativeIds')(form.creativeIds.includes(id) ? form.creativeIds.filter((x) => x !== id) : [...form.creativeIds, id]);
 
   const requestClose = () => (dirty ? setConfirmClose(true) : onClose());
@@ -120,6 +140,10 @@ export function CampaignSheet({ open, campaign, creatives, domains, onClose, onS
       targetingMode: form.targetingMode,
       domainIds: form.targetingMode === 'all' ? [] : form.domainIds,
       creativeIds: form.creativeIds,
+      formats: form.formats,
+      skipAfterSeconds: form.skipAfter === '' ? null : Number(form.skipAfter),
+      rewardWatchPercent: form.rewardWatchPercent,
+      premiumSkipSeconds: form.premiumSkip === '' ? null : Number(form.premiumSkip),
     };
     try {
       const { campaign: saved } = campaign ? await patch(api(`/campaigns/${campaign.id}`), body) : await post(api('/campaigns'), body);
@@ -176,6 +200,38 @@ export function CampaignSheet({ open, campaign, creatives, domains, onClose, onS
             </Field>
           </div>
 
+          <fieldset>
+            <legend className="copy-13 font-medium text-gray-900">Formats</legend>
+            <p className="mt-1 copy-13 text-gray-900">Where this campaign may appear. Video never autoplays; viewers start it themselves.</p>
+            <div className="mt-2 grid gap-1 sm:grid-cols-2">
+              {Object.entries(FORMAT_LABELS).map(([value, label]) => (
+                <Checkbox key={value} checked={form.formats.includes(value)} onChange={() => toggleFormat(value)}>
+                  {label}
+                </Checkbox>
+              ))}
+            </div>
+            {show('formats') && <p role="alert" className="mt-1 copy-13 text-red-text">{show('formats')}</p>}
+          </fieldset>
+
+          {hasVideo && (
+            <div className="flex flex-col gap-4 rounded-md border border-gray-400 p-4">
+              <p className="copy-13 font-medium text-gray-900">Video playback rules</p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Skip after" optional hint="Embedded and full-screen ads. Empty means no skip button." error={show('skipAfter')}>
+                  {(props) => <Input {...props} {...input('skipAfter')} inputMode="numeric" placeholder="Never" suffix="sec" />}
+                </Field>
+                <Field label="Premium skip after" optional hint="Rewarded ads. Premium viewers keep the reward when they skip. Empty means they watch like everyone else." error={show('premiumSkip')}>
+                  {(props) => <Input {...props} {...input('premiumSkip')} inputMode="numeric" placeholder="Off" suffix="sec" />}
+                </Field>
+              </div>
+              {form.formats.includes('video_rewarded') && (
+                <Field label={<>Watch required for a reward <span className="ml-1 font-mono text-gray-1000 tabular">{form.rewardWatchPercent}%</span></>} hint="Free viewers must watch this share of the video; it is checked against server time, not the browser's.">
+                  {(props) => <Slider {...props} value={form.rewardWatchPercent} onChange={set('rewardWatchPercent')} min={50} max={100} step={5} />}
+                </Field>
+              )}
+            </div>
+          )}
+
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Starts" optional error={show('startsAt')}>
               {(props) => <Input {...props} {...input('startsAt')} type="datetime-local" />}
@@ -212,7 +268,7 @@ export function CampaignSheet({ open, campaign, creatives, domains, onClose, onS
             )}
           </div>
 
-          <fieldset>
+          {form.formats.includes('banner') && <fieldset>
             <legend className="copy-13 font-medium text-gray-900">Creatives</legend>
             <p className="mt-1 copy-13 text-gray-900">One or more per size. A slot shows this campaign only in sizes it has a creative for.</p>
             {bySize.length === 0 ? (
@@ -250,7 +306,36 @@ export function CampaignSheet({ open, campaign, creatives, domains, onClose, onS
                 ))}
               </div>
             )}
-          </fieldset>
+          </fieldset>}
+
+          {hasVideo && (
+            <fieldset>
+              <legend className="copy-13 font-medium text-gray-900">Videos</legend>
+              <p className="mt-1 copy-13 text-gray-900">Only videos marked ready are served, in the placements set on each video.</p>
+              {usableVideos.length === 0 ? (
+                <p className="mt-3 rounded-md border border-dashed border-gray-400 p-4 copy-13 text-gray-900">
+                  No videos available.{' '}
+                  <Link to="/creatives/videos" className="text-blue-text underline-offset-2 hover:underline">
+                    Add a video
+                  </Link>{' '}
+                  first; your draft is kept.
+                </p>
+              ) : (
+                <div className="mt-3 flex flex-col gap-1">
+                  {usableVideos.map((video) => (
+                    <Checkbox key={video.id} checked={form.creativeIds.includes(video.id)} onChange={() => toggleCreative(video.id)}>
+                      <span className="min-w-0">
+                        {video.title}{' '}
+                        <span className="copy-13 text-gray-900">
+                          · {video.status === 'ready' ? `${Math.round(video.duration_seconds || 0)}s` : video.status} · {video.placements.map((p) => FORMAT_LABELS[p].replace(' video', '')).join(', ')}
+                        </span>
+                      </span>
+                    </Checkbox>
+                  ))}
+                </div>
+              )}
+            </fieldset>
+          )}
         </form>
       </Sheet>
 

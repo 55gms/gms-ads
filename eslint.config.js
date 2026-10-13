@@ -3,7 +3,7 @@ import globals from 'globals';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
 
-const loaders = ['overview', 'campaigns', 'creatives', 'analytics', 'domains', 'members', 'sizes', 'keys', 'ingest', 'audit'].map((n) => `${n}Loader`);
+const loaders = ['overview', 'campaigns', 'creatives', 'analytics', 'domains', 'members', 'sizes', 'keys', 'ingest', 'audit', 'videos', 'videoAnalytics', 'providers'].map((n) => `${n}Loader`);
 
 export default [
   { ignores: ['web/dist', 'embed/dist', 'node_modules', 'web/public'] },

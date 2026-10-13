@@ -8,6 +8,8 @@ const SERIES = [
   { key: 'impressions', label: 'Impressions', color: 'var(--ds-blue)' },
   { key: 'clicks', label: 'Clicks', color: 'var(--ds-purple)' },
 ];
+// The ratio shown under the series: `num / den` as a percentage.
+const CTR = { label: 'CTR', num: 'clicks', den: 'impressions' };
 const PAD = { top: 16, right: 12, bottom: 28, left: 12 };
 
 // Rounds a maximum up to a tidy axis ceiling (1, 2, 2.5, 5 × 10^n).
@@ -31,8 +33,8 @@ function useWidth(ref) {
 // Impressions and clicks over time. Each series has its own scale so clicks
 // stay readable next to much larger impression counts. `points` is
 // [{ t: Date, impressions, clicks, incomplete }]; an incomplete last point is
-// joined with a dashed segment.
-export function LineChart({ points, granularity, height = 280, drawIn = false, rangeKey }) {
+// joined with a dashed segment. `series` and `ratio` swap in other metrics.
+export function LineChart({ points, granularity, height = 280, drawIn = false, rangeKey, series: seriesDef = SERIES, ratio = CTR }) {
   const wrapRef = useRef(null);
   const width = useWidth(wrapRef);
   const [hover, setHover] = useState(null);
@@ -47,7 +49,7 @@ export function LineChart({ points, granularity, height = 280, drawIn = false, r
     const innerH = height - PAD.top - PAD.bottom;
     const x = (i) => PAD.left + (points.length === 1 ? innerW / 2 : (i / (points.length - 1)) * innerW);
     const lastComplete = points[points.length - 1].incomplete ? points.length - 2 : points.length - 1;
-    const series = SERIES.map((s) => {
+    const series = seriesDef.map((s) => {
       const max = niceMax(Math.max(...points.map((p) => p[s.key])));
       const y = (v) => PAD.top + innerH - (v / max) * innerH;
       const coords = points.map((p, i) => [x(i), y(p[s.key])]);
@@ -62,7 +64,7 @@ export function LineChart({ points, granularity, height = 280, drawIn = false, r
     });
     const every = Math.max(1, Math.ceil(points.length / Math.max(2, Math.floor(innerW / 80))));
     return { innerW, innerH, x, series, every };
-  }, [width, height, points]);
+  }, [width, height, points, seriesDef]);
 
   const tickLabel = (t) => (granularity === 'hour' ? hourLabel(t) : shortDate(t));
   const fullLabel = (p) => (granularity === 'hour' ? `${shortDate(p.t)}, ${clock(p.t)}` : longDate(p.t));
@@ -82,7 +84,7 @@ export function LineChart({ points, granularity, height = 280, drawIn = false, r
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <ul className="flex items-center gap-4" aria-label="Series">
-          {SERIES.map((s) => (
+          {seriesDef.map((s) => (
             <li key={s.key} className="flex items-center gap-2 copy-13 text-gray-900">
               <span aria-hidden="true" className="h-0.5 w-3 rounded-full" style={{ background: s.color }} />
               {s.label}
@@ -107,7 +109,7 @@ export function LineChart({ points, granularity, height = 280, drawIn = false, r
             <caption className="sr-only">Impressions and clicks over time</caption>
             <thead className="sticky top-0 bg-background-200 text-gray-900">
               <tr>
-                {['Period', 'Impressions', 'Clicks', 'CTR'].map((h, i) => (
+                {['Period', ...seriesDef.map((x) => x.label), ratio.label].map((h, i) => (
                   <th key={h} scope="col" className={cx('h-9 border-b border-gray-400 px-4 font-medium', i ? 'text-right' : 'text-left')}>
                     {h}
                   </th>
@@ -121,9 +123,12 @@ export function LineChart({ points, granularity, height = 280, drawIn = false, r
                     {fullLabel(p)}
                     {p.incomplete && <span className="ml-2 font-sans text-gray-700">In progress</span>}
                   </th>
-                  <td className="px-4 text-right tabular">{num(p.impressions)}</td>
-                  <td className="px-4 text-right tabular">{num(p.clicks)}</td>
-                  <td className="px-4 text-right tabular">{pct(ctr(p.clicks, p.impressions))}</td>
+                  {seriesDef.map((x) => (
+                    <td key={x.key} className="px-4 text-right tabular">
+                      {num(p[x.key])}
+                    </td>
+                  ))}
+                  <td className="px-4 text-right tabular">{pct(ctr(p[ratio.num], p[ratio.den]))}</td>
                 </tr>
               ))}
             </tbody>
@@ -183,7 +188,7 @@ export function LineChart({ points, granularity, height = 280, drawIn = false, r
                 {fullLabel(hovered)}
                 {hovered.incomplete && ' · in progress'}
               </p>
-              {SERIES.map((s) => (
+              {seriesDef.map((s) => (
                 <p key={s.key} className="mt-1.5 flex items-center justify-between gap-3 copy-13">
                   <span className="flex items-center gap-2 text-gray-900">
                     <span className="h-2 w-2 rounded-full" style={{ background: s.color }} />
@@ -193,8 +198,8 @@ export function LineChart({ points, granularity, height = 280, drawIn = false, r
                 </p>
               ))}
               <p className="mt-1.5 flex items-center justify-between gap-3 border-t border-gray-400 pt-1.5 copy-13">
-                <span className="text-gray-900">CTR</span>
-                <span className="font-medium tabular">{pct(ctr(hovered.clicks, hovered.impressions))}</span>
+                <span className="text-gray-900">{ratio.label}</span>
+                <span className="font-medium tabular">{pct(ctr(hovered[ratio.num], hovered[ratio.den]))}</span>
               </p>
             </div>
           )}

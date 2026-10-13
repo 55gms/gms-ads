@@ -9,6 +9,9 @@ import { Overview, overviewLoader } from './pages/Overview.jsx';
 import { ApiKeys, AuditLog, Ingestion, Members, Settings, Sizes, auditLoader, ingestLoader, keysLoader, membersLoader, sizesLoader } from './pages/Settings.jsx';
 import { SignIn } from './pages/SignIn.jsx';
 import { Snippet } from './pages/Snippet.jsx';
+import { Providers, providersLoader } from './pages/Providers.jsx';
+import { VideoAnalytics, videoAnalyticsLoader } from './pages/VideoAnalytics.jsx';
+import { Videos, videosLoader } from './pages/Videos.jsx';
 
 // Signed-out visitors go to the sign-in page and come back afterwards.
 async function rootLoader({ request }) {
@@ -42,7 +45,9 @@ export const router = createBrowserRouter([
           { index: true, loader: overviewLoader, element: <Overview /> },
           { path: 'campaigns', loader: campaignsLoader, element: <Campaigns /> },
           { path: 'creatives', loader: creativesLoader, element: <Creatives /> },
+          { path: 'creatives/videos', loader: videosLoader, element: <Videos /> },
           { path: 'analytics', loader: analyticsLoader, element: <Analytics /> },
+          { path: 'analytics/video', loader: videoAnalyticsLoader, element: <VideoAnalytics /> },
           { path: 'domains', loader: domainsLoader, element: <Domains /> },
           { path: 'snippet', element: <Snippet /> },
           {
@@ -53,6 +58,7 @@ export const router = createBrowserRouter([
               { path: 'members', loader: membersLoader, element: <Members /> },
               { path: 'sizes', loader: sizesLoader, element: <Sizes /> },
               { path: 'keys', loader: keysLoader, element: <ApiKeys /> },
+              { path: 'providers', loader: providersLoader, element: <Providers /> },
               { path: 'ingestion', loader: ingestLoader, element: <Ingestion /> },
               { path: 'audit', loader: auditLoader, element: <AuditLog /> },
             ],

@@ -12,6 +12,7 @@ import { DateRangePicker } from '../ui/DateRangePicker.jsx';
 import { Input, Select } from '../ui/Field.jsx';
 import { Card, EmptyState, PageHeader, StatCard } from '../ui/Misc.jsx';
 import { Pagination, Table } from '../ui/Table.jsx';
+import { AnalyticsTabs } from './VideoAnalytics.jsx';
 
 const PAGE_SIZE = 25;
 
@@ -89,6 +90,7 @@ export function Analytics() {
         }
       />
 
+      <AnalyticsTabs active="display" />
       <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
         <Select aria-label="Campaign" value={filters.campaignId || ''} onChange={(e) => setParam({ campaignId: e.target.value, creativeId: '' })}>
           <option value="">All campaigns</option>

@@ -15,3 +15,10 @@ export function scheduleLabel(campaign, fmt) {
   if (end) return `Until ${fmt(end)}`;
   return 'Always';
 }
+
+export const FORMAT_LABELS = {
+  banner: 'Banner',
+  video_embedded: 'Embedded video',
+  video_fullscreen: 'Full-screen video',
+  video_rewarded: 'Rewarded video',
+};
