@@ -146,11 +146,14 @@ function readRequest(body, siteKey) {
   };
 }
 
-async function checkViewerLimits(viewerKey) {
+// Embedded slots fill on page view, so they are excluded from both limits;
+// the limits are about ads a viewer opens, rewarded ones above all.
+async function checkViewerLimits(viewerKey, format) {
+  if (format === 'video_embedded') return;
   const { rows } = await query(
-    `SELECT count(*) FILTER (WHERE created_at > now() - interval '1 hour')::int AS hour,
+    `SELECT count(*)::int AS hour,
             count(*) FILTER (WHERE state IN ('created', 'started') AND expires_at > now())::int AS open
-       FROM ad_sessions WHERE viewer_key = $1 AND created_at > now() - interval '1 hour'`,
+       FROM ad_sessions WHERE viewer_key = $1 AND format <> 'video_embedded' AND created_at > now() - interval '1 hour'`,
     [viewerKey]
   );
   if (rows[0].hour >= config.video.maxSessionsPerHour) throw new HttpError(429, 'rate_limited', 'Too many ads requested. Try again later.');
@@ -213,7 +216,7 @@ export async function createSession(body, siteKey) {
   const snapshot = await candidates();
   const statKey = { provider: req.provider === 'auto' ? 'first_party' : req.provider, format: req.format, game_id: req.gameId, domain: req.domain };
   if (hostMatchesAny(snapshot.blocked, req.domain)) return { fill: false, reason: 'domain_off', fallbacks: [] };
-  await checkViewerLimits(req.viewerKey);
+  await checkViewerLimits(req.viewerKey, req.format);
 
   if (req.provider !== 'auto') {
     // A provider-backed session only records what the provider reports.

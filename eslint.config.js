@@ -15,7 +15,7 @@ export default [
   },
   {
     files: ['embed/src/**/*.js'],
-    languageOptions: { ecmaVersion: 2020, sourceType: 'module', globals: globals.browser },
+    languageOptions: { ecmaVersion: 2020, sourceType: 'module', globals: { ...globals.browser, __VIDEO_SRI__: 'readonly' } },
     rules: { 'no-unused-vars': ['error', { argsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }] },
   },
   {

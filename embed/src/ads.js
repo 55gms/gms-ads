@@ -9,6 +9,11 @@ import { pickSizes, parseSize } from './sizes.js';
 
   var script = doc.currentScript;
   var base = ((script && script.getAttribute('data-endpoint')) || '/_ads').replace(/\/+$/, '');
+  // Video and rewarded calls may go to another mount, e.g. one under /api so
+  // the site's session cookie (and with it Premium) reaches the edge.
+  var videoBase = ((script && script.getAttribute('data-video-endpoint')) || base).replace(/\/+$/, '');
+  var videoSrc = (script && script.getAttribute('data-video-src')) || (script && script.src ? script.src.replace(/ads(\.min)?\.js(\?.*)?$/, 'video.min.js') : '');
+  var videoLoad = null;
   var ATTR = 'data-55gms-ad';
   var pending = []; // slots waiting for the next batched serve request
   var serveTimer = 0;
@@ -159,6 +164,33 @@ import { pickSizes, parseSize } from './sizes.js';
       });
   }
 
+  // video.min.js is fetched only when a page has a video slot or a game asks
+  // for an ad, with the integrity hash baked in at build time.
+  function loadVideo() {
+    videoLoad =
+      videoLoad ||
+      new Promise(function (resolve, reject) {
+        if (win.__gmsAdsVideo) return resolve(win.__gmsAdsVideo.host(videoBase));
+        var s = doc.createElement('script');
+        s.src = videoSrc;
+        s.async = true;
+        if (/^https:/.test(videoSrc) && __VIDEO_SRI__) {
+          s.integrity = __VIDEO_SRI__;
+          s.crossOrigin = 'anonymous';
+        }
+        s.onload = function () {
+          if (win.__gmsAdsVideo) resolve(win.__gmsAdsVideo.host(videoBase));
+          else reject(new Error('video'));
+        };
+        s.onerror = function () {
+          videoLoad = null;
+          reject(new Error('video'));
+        };
+        doc.head.appendChild(s);
+      });
+    return videoLoad;
+  }
+
   function enqueue(slot) {
     slot.sizes = sizesFor(slot);
     slot.key = slot.sizes.join(',');
@@ -177,6 +209,23 @@ import { pickSizes, parseSize } from './sizes.js';
       if (el.__gmsAd) return;
       el.__gmsAd = 1;
       var slot = { el: el, sizes: [], key: '' };
+      if (el.getAttribute('data-format') === 'video') {
+        // Falls back to an image ad only when the slot asks for it.
+        var toImage = function () {
+          slots.push(slot);
+          enqueue(slot);
+        };
+        loadVideo().then(
+          function (video) {
+            video.renderSlot(el, toImage);
+          },
+          function () {
+            if (el.getAttribute('data-fallback') === 'image') toImage();
+            else collapse(slot);
+          }
+        );
+        return;
+      }
       slots.push(slot);
       enqueue(slot);
     });
@@ -219,6 +268,29 @@ import { pickSizes, parseSize } from './sizes.js';
       resizeTimer = setTimeout(onResize, 300);
     });
     win.addEventListener('pagehide', flushImpressions);
+    // Game iframes ask for ads with postMessage. Only messages from frames
+    // this page registered (iframe[data-gms-game]) are acted on; video.min.js
+    // does the full validation.
+    var early = [];
+    var onBridge = function (e) {
+      if (!e.data || e.data.gmsAds !== 1 || e.data.kind !== 'req' || !doc.querySelector('iframe[data-gms-game]')) return;
+      // Queued until video.min.js arrives, then handed over in order.
+      early.push(e);
+      if (early.length > 1) return;
+      loadVideo().then(
+        function (video) {
+          win.removeEventListener('message', onBridge);
+          video.attachBridge(early);
+        },
+        function () {
+          // Answer so the game does not wait for a timeout; the next request retries.
+          early.splice(0).forEach(function (m) {
+            if (m.source) m.source.postMessage({ gmsAds: 1, kind: 'res', id: m.data.id, ok: false, error: 'unavailable' }, m.origin);
+          });
+        }
+      );
+    };
+    win.addEventListener('message', onBridge);
     doc.addEventListener('visibilitychange', function () {
       if (doc.visibilityState === 'hidden') flushImpressions();
     });

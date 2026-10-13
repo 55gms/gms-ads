@@ -93,7 +93,7 @@ export function createAdsRouter(options = {}) {
     instanceId: options.instanceId || null,
     mountPath: options.mountPath || '/_ads',
     trustForwardedHost: options.trustForwardedHost ?? false,
-    rateLimit: { serve: 240, impression: 240, click: 60, media: 240, video: 60, videoEvent: 600, windowMs: 60 * 1000, ...options.rateLimit },
+    rateLimit: { serve: 240, impression: 240, click: 60, media: 240, video: 120, videoEvent: 900, windowMs: 60 * 1000, ...options.rateLimit },
     // Video and rewarded ads. Off with `video: false`.
     video: options.video ?? true,
     // (req) => { userId?, premium? } | null, from the host app's own session.
@@ -747,9 +747,9 @@ export function createAdsRouter(options = {}) {
   const slugOrNull = (v) => (typeof v === 'string' && SLUG_RE.test(v) ? v : null);
 
   // Pseudonymous viewer key: an HMAC of the signed-in user, or of IP, user
-  // agent, and the UTC day for anonymous visitors. No cookie, nothing that
-  // follows a visitor across days or sites.
-  async function viewerOf(req) {
+  // agent, the UTC day, and a per-tab nonce for anonymous visitors. No
+  // cookie, nothing that follows a visitor across days or sites.
+  async function viewerOf(req, nonce) {
     let info = null;
     if (opts.resolveViewer) {
       try {
@@ -759,7 +759,11 @@ export function createAdsRouter(options = {}) {
       }
     }
     const day = new Date(opts.now()).toISOString().slice(0, 10);
-    const basis = info?.userId ? `u:${info.userId}` : `a:${day}:${ipOf(req)}:${req.headers['user-agent'] || ''}`;
+    // The per-tab nonce keeps visitors behind one school NAT, on identical
+    // devices, from sharing a key. It is client-chosen, so per-IP limits here
+    // remain the abuse control for anonymous traffic.
+    const tab = typeof nonce === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(nonce) ? nonce : '';
+    const basis = info?.userId ? `u:${info.userId}` : `a:${day}:${ipOf(req)}:${req.headers['user-agent'] || ''}:${tab}`;
     return { key: sign(`viewer|${basis}`).slice(0, 32), premium: info?.premium === true };
   }
 
@@ -795,7 +799,7 @@ export function createAdsRouter(options = {}) {
     const domain = hostOf(req);
     if (!format) return send(res, 400, { error: 'format required' });
     if (isBot(req) || !canServe(domain)) return send(res, 200, kind === 'available' ? { available: false } : { fill: false, reason: 'not_served' });
-    const viewer = await viewerOf(req);
+    const viewer = await viewerOf(req, body.nonce);
     const payload = { format, domain, gameId: slugOrNull(body.gameId) };
     if (kind === 'session') {
       Object.assign(payload, {

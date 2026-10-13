@@ -1,7 +1,27 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "file": "embed/dist/ads.min.js",
-  "bytes": 4544,
-  "gzipBytes": 2194,
-  "integrity": "sha384-czZZMouRahXbtvwrh6bKuo9VokxpOxgW0mxFqdTy0GNuh3Rm6hyvWnfAAzyCdzAd"
+  "bytes": 5765,
+  "gzipBytes": 2721,
+  "integrity": "sha384-jOvc7f39ghFMUn6SpzPBbKjLFBHdI9VH0jAmPJ6dhvWl/M0p5PjHIceelVcKg8z4",
+  "files": {
+    "video": {
+      "file": "embed/dist/video.min.js",
+      "bytes": 26976,
+      "gzipBytes": 10152,
+      "integrity": "sha384-Vdz4CWGJGqQWI8wP85N4ft0dxmRaqOMTeGVIZP2YodXzrcHvDhN4Lns75sEWx64Q"
+    },
+    "ads": {
+      "file": "embed/dist/ads.min.js",
+      "bytes": 5765,
+      "gzipBytes": 2721,
+      "integrity": "sha384-jOvc7f39ghFMUn6SpzPBbKjLFBHdI9VH0jAmPJ6dhvWl/M0p5PjHIceelVcKg8z4"
+    },
+    "sdk": {
+      "file": "embed/dist/sdk.min.js",
+      "bytes": 6145,
+      "gzipBytes": 2767,
+      "integrity": "sha384-Lql+mnDPV4E0E3zGx85kNRKiE5HzpWOG8tZyzxtdoRM2stD1ZQ1/tuxswvQZy50X"
+    }
+  }
 }
