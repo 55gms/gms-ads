@@ -116,7 +116,7 @@ Create a key under **Settings → API keys** and copy it; it is shown once.
 
 ### 1. Mount the edge module
 
-`edge/` has no dependencies. Until it is published to npm, either copy the `edge/` directory into the 55GMS server repository or install a tarball built with `npm pack ./edge`.
+`edge/` has no dependencies and is published to npm as `@55gms/ads-edge`: run `npm install @55gms/ads-edge` in the 55GMS server repository. To release a change, bump `version` in `edge/package.json` and run `npm publish --access public` from `edge/`.
 
 ```js
 import { createAdsRouter } from '@55gms/ads-edge';
