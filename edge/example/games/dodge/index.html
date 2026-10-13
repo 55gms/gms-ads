@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dodge</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #101014; color: #fff; font: 15px/1.4 system-ui, sans-serif; overflow: hidden; }
+      canvas { display: block; width: 100%; height: 100%; }
+      #hud { position: absolute; top: 10px; left: 12px; font-weight: 600; }
+      #panel { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, 0.6); text-align: center; }
+      #panel[hidden] { display: none; }
+      #panel h2 { margin: 0 0 6px; }
+      #panel p { margin: 0 0 14px; opacity: 0.8; }
+      button { font: inherit; font-weight: 600; padding: 8px 14px; margin: 4px; border-radius: 8px; border: 0; cursor: pointer; }
+      .primary { background: #facc15; color: #000; }
+      .ghost { background: #2a2a30; color: #fff; }
+      #status { min-height: 1.4em; font-size: 13px; opacity: 0.8; }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <div id="hud">Lives: <span id="lives">1</span> · Score: <span id="score">0</span></div>
+    <div id="panel" role="dialog" aria-labelledby="title">
+      <div>
+        <h2 id="title">Dodge</h2>
+        <p id="msg">Move with the arrow keys or your mouse. Avoid the blocks.</p>
+        <button type="button" class="primary" id="revive" hidden>Watch an ad to get an extra life</button>
+        <button type="button" class="ghost" id="play">Start</button>
+        <p id="status" aria-live="polite"></p>
+      </div>
+    </div>
+    <script src="/sdk.min.js"></script>
+    <script>
+      // Game state. The reward below changes it: an ad that is granted gives a life.
+      const canvas = document.getElementById('c');
+      const ctx = canvas.getContext('2d');
+      const ui = { lives: document.getElementById('lives'), score: document.getElementById('score'), panel: document.getElementById('panel'), title: document.getElementById('title'), msg: document.getElementById('msg'), revive: document.getElementById('revive'), play: document.getElementById('play'), status: document.getElementById('status') };
+      let w, h, player, blocks, score, lives, running = false, paused = false, last = 0, spawn = 0;
+
+      const resize = () => { w = canvas.width = innerWidth; h = canvas.height = innerHeight; };
+      addEventListener('resize', resize);
+      resize();
+
+      function reset() {
+        player = { x: w / 2, y: h - 40, s: 26 };
+        blocks = []; score = 0; lives = 1; spawn = 0;
+        ui.lives.textContent = lives;
+      }
+      function start() { ui.panel.hidden = true; running = true; last = performance.now(); requestAnimationFrame(loop); }
+      function gameOver() {
+        running = false;
+        ui.title.textContent = 'Game over';
+        ui.msg.textContent = 'Score ' + Math.floor(score) + '.';
+        ui.play.textContent = 'Restart';
+        ui.status.textContent = '';
+        ui.panel.hidden = false;
+        offerRevive();
+      }
+
+      // --- Ads ------------------------------------------------------------
+      // The SDK pauses and resumes the game around any ad and never leaves it paused.
+      const ready = GMSAds.init({
+        gameId: 'demo-dodge',
+        onPause: () => { paused = true; },
+        onResume: () => { paused = false; last = performance.now(); },
+      });
+
+      async function offerRevive() {
+        ui.revive.hidden = true;
+        await ready;
+        // Offer the reward only when an ad can actually be shown.
+        if (await GMSAds.isRewardedAdAvailable({ placement: 'revive' })) ui.revive.hidden = false;
+      }
+
+      ui.revive.addEventListener('click', async () => {
+        ui.revive.disabled = true;
+        ui.status.textContent = 'Loading ad…';
+        const result = await GMSAds.showRewardedAd({ placement: 'revive', rewardId: 'extra-life', rewardLabel: 'an extra life' });
+        ui.revive.disabled = false;
+        if (result.rewardGranted) {
+          lives += 1;                       // the actual in-game reward
+          ui.lives.textContent = lives;
+          ui.revive.hidden = true;
+          blocks = blocks.filter((b) => b.y < h / 2); // a little breathing room
+          ui.status.textContent = 'Extra life granted (' + result.method + ').';
+          document.body.dataset.lastGrant = result.grant ? result.grant.id : 'none';
+          start();
+        } else {
+          ui.status.textContent = { cancelled: 'No ad watched, no extra life.', skipped: 'Ad skipped, no extra life.', no_fill: 'No ad available right now.', busy: 'An ad is already open.' }[result.status] || 'The ad could not be shown.';
+        }
+        document.body.dataset.lastOutcome = result.status;
+      });
+      ui.play.addEventListener('click', () => { reset(); start(); });
+
+      // --- Loop -----------------------------------------------------------
+      addEventListener('mousemove', (e) => { player.x = e.clientX; });
+      addEventListener('keydown', (e) => { if (e.key === 'ArrowLeft') player.x -= 30; if (e.key === 'ArrowRight') player.x += 30; });
+
+      function loop(now) {
+        if (!running) return;
+        const dt = Math.min(0.05, (now - last) / 1000);
+        last = now;
+        if (!paused) {
+          score += dt * 10;
+          spawn -= dt;
+          if (spawn <= 0) { blocks.push({ x: Math.random() * w, y: -20, s: 18 + Math.random() * 26, v: 180 + score * 4 }); spawn = Math.max(0.18, 0.7 - score / 200); }
+          for (const b of blocks) b.y += b.v * dt;
+          blocks = blocks.filter((b) => b.y < h + 40);
+          const hit = blocks.find((b) => Math.abs(b.x - player.x) < (b.s + player.s) / 2 && Math.abs(b.y - player.y) < (b.s + player.s) / 2);
+          if (hit) {
+            blocks.splice(blocks.indexOf(hit), 1);
+            lives -= 1;
+            ui.lives.textContent = lives;
+            if (lives <= 0) return gameOver();
+          }
+        }
+        ctx.fillStyle = '#101014'; ctx.fillRect(0, 0, w, h);
+        ctx.fillStyle = '#ef4444'; for (const b of blocks) ctx.fillRect(b.x - b.s / 2, b.y - b.s / 2, b.s, b.s);
+        ctx.fillStyle = '#facc15'; ctx.fillRect(player.x - player.s / 2, player.y - player.s / 2, player.s, player.s);
+        ui.score.textContent = Math.floor(score);
+        requestAnimationFrame(loop);
+      }
+      reset();
+    </script>
+  </body>
+</html>

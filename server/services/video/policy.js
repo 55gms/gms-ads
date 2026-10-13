@@ -9,7 +9,7 @@ const QUARTILE_SHARE = { q1: 0.25, midpoint: 0.5, q3: 0.75, complete: 1 };
 
 // Allowed slack between server elapsed time and claimed position, for network
 // latency between the start event and real playback.
-export const CLOCK_TOLERANCE_S = 2;
+export const CLOCK_TOLERANCE_S = 1.5;
 const EXTERNAL = new Set(['google_h5', 'vast']);
 
 export const isProviderSession = (session) => EXTERNAL.has(session.provider);

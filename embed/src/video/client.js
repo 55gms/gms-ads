@@ -2,7 +2,8 @@
 // in order; terminal events (complete, skip, close, error) are flushed at
 // once and awaited, because a reward claim depends on them being recorded.
 
-const TERMINAL = { complete: 1, skip: 1, close: 1, error: 1 };
+// 'start' too: the server times completion from when it hears about it.
+const TERMINAL = { start: 1, complete: 1, skip: 1, close: 1, error: 1 };
 
 function nonce() {
   // Per-tab, so visitors on one shared network do not share limits. Not

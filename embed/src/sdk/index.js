@@ -122,7 +122,10 @@ import { installCompat, registerAdapter } from './compat.js';
     win.addEventListener('message', onMessage);
     initPromise = (async () => {
       if (win.parent && win.parent !== win) {
-        const r = await call('init', {}, opts.timeoutMs);
+        // The parent's ads.js loads async and may not be listening yet, so
+        // the hello is repeated in short attempts within the timeout.
+        let r = { error: 'timeout' };
+        for (let waited = 0; r.error === 'timeout' && waited < opts.timeoutMs; waited += 500) r = await call('init', {}, 500);
         if (!r.error) {
           state.mode = 'bridge';
           state.enabled = Boolean(r.enabled);

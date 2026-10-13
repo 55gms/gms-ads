@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>55GMS video ads demo</title>
+    <style>
+      body { margin: 0; font: 15px/1.5 system-ui, sans-serif; background: #0b0b0c; color: #ededed; }
+      main { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      p { color: #a1a1a1; margin: 0 0 16px; }
+      #gameframe { aspect-ratio: 16 / 10; background: #000; border-radius: 8px; overflow: hidden; }
+      #gameframe iframe { width: 100%; height: 100%; border: 0; display: block; }
+      .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 16px 0; }
+      button { font: inherit; padding: 6px 12px; border-radius: 6px; border: 1px solid #333; background: #1a1a1a; color: inherit; cursor: pointer; }
+      button[aria-pressed='true'] { background: #ededed; color: #000; }
+      .slot { max-width: 640px; margin-top: 24px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Rewarded video demo</h1>
+      <p>The game below runs in an iframe and asks this page for ads through the bridge. Die, then choose to watch an ad for an extra life.</p>
+      <div class="row" role="group" aria-label="Demo viewer">
+        <span>Signed in as:</span>
+        <button type="button" data-premium="false">Free player</button>
+        <button type="button" data-premium="true">Premium player</button>
+        <span id="who"></span>
+      </div>
+      <!-- The 55GMS game page registers its game iframe with data-gms-game. -->
+      <div id="gameframe"><iframe data-gms-game="demo-dodge" src="/games/dodge/index.html" title="Dodge (demo game)"></iframe></div>
+
+      <h2 style="font-size: 16px; margin: 32px 0 4px">Embedded video slot</h2>
+      <p>Requested when near the viewport; plays only after a click. Falls back to an image ad if there is no video.</p>
+      <div class="slot"><div data-55gms-ad data-format="video" data-fallback="image"></div></div>
+    </main>
+    <script>
+      const buttons = document.querySelectorAll('[data-premium]');
+      const mark = (premium) => {
+        buttons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.premium === String(premium))));
+        document.getElementById('who').textContent = premium ? 'Premium skips rewarded ads after 5 s and keeps the reward.' : 'Free players watch the whole ad for a reward.';
+      };
+      buttons.forEach((b) =>
+        b.addEventListener('click', async () => {
+          const premium = b.dataset.premium === 'true';
+          await fetch('/_debug/viewer', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ premium }) });
+          mark(premium);
+        })
+      );
+      mark(/demo_premium=1/.test(document.cookie));
+    </script>
+    <script async src="/ads.min.js"></script>
+  </body>
+</html>
