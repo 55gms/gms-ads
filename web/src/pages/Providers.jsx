@@ -8,7 +8,7 @@ import { toast } from '../lib/stores.js';
 import { Badge } from '../ui/Badge.jsx';
 import { Button } from '../ui/Button.jsx';
 import { Checkbox, Switch } from '../ui/Controls.jsx';
-import { Field, Input } from '../ui/Field.jsx';
+import { Field, Input, Textarea } from '../ui/Field.jsx';
 
 export const providersLoader = () => get(api('/providers'));
 
@@ -79,8 +79,16 @@ function ProviderCard({ provider, canEdit, onSaved }) {
           </Field>
           {provider.type === 'google_h5' && (
             <>
-              <Field label="Publisher ID" error={errors.client} hint="From an AdSense account approved for H5 Games Ads.">
+              <Field label="Publisher ID" error={errors.client} hint="From your AdSense account.">
                 {(props) => <Input {...props} mono placeholder="ca-pub-0000000000000000" disabled={!canEdit} value={config.client || ''} onChange={setCfg('client')} />}
+              </Field>
+              <Field label="Approved sites" error={errors.domains} hint="One per line. Google runs only on these; *.example.com covers subdomains. Empty means nowhere.">
+                {(props) => (
+                  <Textarea {...props} mono rows={3} placeholder={'55gms.com\n*.55gms.com'} disabled={!canEdit} value={Array.isArray(config.domains) ? config.domains.join('\n') : config.domains || ''} onChange={setCfg('domains')} />
+                )}
+              </Field>
+              <Field label="Display ad slot" optional error={errors.displaySlot} hint="The data-ad-slot number of a display unit. When set, Google fills every banner slot on the approved sites and campaigns do not serve there.">
+                {(props) => <Input {...props} mono placeholder="0000000000" disabled={!canEdit} value={config.displaySlot || ''} onChange={setCfg('displaySlot')} />}
               </Field>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Frequency hint" error={errors.frequencyHint}>
@@ -135,7 +143,7 @@ export function Providers() {
       <div className="mb-4">
         <h2 className="heading-20">Ad providers</h2>
         <p className="mt-1 copy-14 text-gray-900">
-          Video requests try first-party campaigns, then enabled providers in order. Settings here are public identifiers only. Provider-reported events appear in video analytics under the provider and are never mixed into campaign numbers.
+          Video requests try first-party campaigns, then enabled providers in order. Banner slots on sites approved for Google are filled by Google display ads. Settings here are public identifiers only. Provider-reported events appear in video analytics under the provider and are never mixed into campaign numbers.
         </p>
       </div>
       <div className="flex flex-col gap-4">
