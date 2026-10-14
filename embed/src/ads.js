@@ -179,12 +179,17 @@ import { pickSizes, parseSize } from './sizes.js';
     ins.setAttribute('data-ad-client', g.client);
     ins.setAttribute('data-ad-slot', g.slot);
     el.appendChild(ins);
-    // Google marks the unit once it knows whether it has an ad for it. A unit
-    // it leaves empty goes to a campaign instead.
+    // Google marks the unit once it knows whether it has an ad for it. Any
+    // status but 'filled' ('unfilled', 'unfill-optimized', ...) means no ad,
+    // and the unit goes to a campaign instead.
     new MutationObserver(function () {
       var status = ins.getAttribute('data-ad-status');
-      if (status === 'filled') ins.style.opacity = '';
-      if (status !== 'unfilled' || !slot.google) return;
+      if (!status) return;
+      if (status === 'filled') {
+        ins.style.opacity = '';
+        return;
+      }
+      if (!slot.google) return;
       slot.google = 0;
       slot.fallback = 1;
       el.textContent = '';
