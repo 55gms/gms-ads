@@ -43,7 +43,7 @@ export const config = {
   accessTtlSeconds: 15 * 60,
   refreshTtlSeconds: 30 * 24 * 60 * 60,
   authometry: {
-    issuer: env.AUTHOMETRY_ISSUER || 'https://authometry.ch3n.cc',
+    issuer: env.AUTHOMETRY_ISSUER || 'https://authometry.jiayangchen.com',
     clientId: env.AUTHOMETRY_CLIENT_ID || '',
     clientSecret: env.AUTHOMETRY_CLIENT_SECRET || '',
     providerLogout: env.AUTHOMETRY_PROVIDER_LOGOUT === 'true',

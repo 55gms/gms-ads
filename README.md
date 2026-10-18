@@ -21,7 +21,7 @@ Browsers never talk to the ad server: the edge also serves uploaded images from 
 
 ## Status
 
-- **Production runs at https://ads.ch3n.cc** on Coolify (project *55GMS*, environment *production*, application `gms-ads`, database `gms-ads-db`, media volume at `/data/media`).
+- **Production runs at https://ads.lsjc.dev** (https://ads.ch3n.cc still serves) on Coolify (project *55GMS*, environment *production*, application `gms-ads`, database `gms-ads-db`, media volume at `/data/media`).
 - **`ads.js` 1.0.0 is tagged (`v1.0.0`) and served by jsDelivr**; the published file matches the SRI hash in `embed/dist/manifest.json`.
 - **The API was exercised end to end against a real Postgres**: migration, creative upload and resize, media caching and WebP negotiation, manifest and 304, gzip batch ingestion, idempotent replay, rejected batches, stats queries, CSV export, roles, CSRF, and refresh-token rotation with reuse detection. The edge module was exercised against a fake ad server (dedupe, forged IDs, bots, local caps, outage spool, crash recovery, in-order resend). These were manual runs, not a kept suite.
 - **No automated tests.** The brief asked for a `node --test` suite; that was dropped on request, so there is no `npm test`.
@@ -88,13 +88,13 @@ The OAuth client is already provisioned:
 
 - Application: **55GMS Ads** (`55gms-ads`), ID `4a6f59b7-a184-4f9e-99c3-91613131b751`
 - Type: confidential `web` client, Authorization Code with S256 PKCE, `client_secret_basic`
-- Environment: Authometry Cloud `production`, issuer `https://authometry.ch3n.cc`
+- Environment: Authometry Cloud `production`, issuer `https://authometry.jiayangchen.com`
 - Scopes: `openid profile email`
 - Redirect URI: `http://localhost:3000/auth/callback`; post-logout: `http://localhost:3000/`
 
 It was created through the Authometry management API (the connected MCP server) rather than `npx authometry apps create`, because no `AUTHOMETRY_TOKEN` was available. The result is the same application; do not run the CLI `create` as well.
 
-`https://ads.ch3n.cc/auth/callback` and `https://ads.ch3n.cc/` are registered as well, for production.
+`https://ads.lsjc.dev/auth/callback` and `https://ads.ch3n.cc/auth/callback` (with `https://ads.lsjc.dev/` and `https://ads.ch3n.cc/` for post-logout) are registered as well, for production.
 
 To add another domain, add `https://<domain>/auth/callback` to the redirect URIs and `https://<domain>/` to the post-logout URIs, and set `PUBLIC_BASE_URL` to match. The Authometry CLI (0.1.2) only has `apps create`, so use the Authometry dashboard (Applications → 55GMS Ads → Redirect URIs) or the management API: `PATCH /applications/4a6f59b7-a184-4f9e-99c3-91613131b751` with the current `version` and the full `redirectUris` and `postLogoutRedirectUris` lists.
 

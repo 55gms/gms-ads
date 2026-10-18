@@ -34,7 +34,7 @@ export function SignIn() {
         )}
         {/* A plain link: navigation starts the server-side login handler. */}
         <a className="authometry-button mt-6" href={href}>
-          <img src="https://authometry.ch3n.cc/brand/authometry-mark.svg" alt="" width="24" height="24" />
+          <img src="https://authometry.jiayangchen.com/brand/authometry-mark.svg" alt="" width="24" height="24" />
           Continue with Authometry
         </a>
         <p className="mt-4 copy-13 text-gray-700">New accounts need approval from an owner before they can open the dashboard.</p>
