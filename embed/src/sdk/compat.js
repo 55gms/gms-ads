@@ -9,13 +9,26 @@
 
 const GENERIC_REWARD = 'a reward in this game';
 
-// Wraps window[name] now, or as soon as the game assigns it.
-function whenDefined(win, name, wrap) {
-  if (win[name]) return wrap(win[name]);
-  let value;
+// Objects already wrapped. Not a marker property: many stand-ins are Proxies
+// that answer every unknown name with a function, so a marker would always
+// read as set.
+const wrapped = typeof WeakSet === 'function' ? new WeakSet() : null;
+function once(obj) {
+  if (!obj || (typeof obj !== 'object' && typeof obj !== 'function') || !wrapped || wrapped.has(obj)) return false;
+  wrapped.add(obj);
+  return true;
+}
+
+// Wraps obj[name] now and every time it is assigned again, as a loader stub
+// that the full SDK later replaces is. A non-configurable property (a
+// top-level var declared before the SDK ran) is only wrapped as it is.
+function whenDefined(obj, name, wrap) {
+  let value = obj[name];
+  if (value) wrap(value);
   try {
-    Object.defineProperty(win, name, {
+    Object.defineProperty(obj, name, {
       configurable: true,
+      enumerable: true,
       get: () => value,
       set: (v) => {
         value = v;
@@ -23,21 +36,21 @@ function whenDefined(win, name, wrap) {
       },
     });
   } catch (_e) {
-    /* non-configurable global; nothing to wrap */
+    /* non-configurable; wrapped above if it was set */
   }
 }
 
 const adapters = {
   // PokiSDK.rewardedBreak() -> Promise<boolean>. Newer signatures pass
-  // { onStart } or a size; onStart is called when the ad begins.
+  // { onStart } or a size, older ones a before-break function; either is
+  // called when the ad begins.
   poki(win, ads) {
     whenDefined(win, 'PokiSDK', (sdk) => {
-      if (sdk.__gmsAds) return;
-      sdk.__gmsAds = 1;
+      if (!once(sdk)) return;
       sdk.rewardedBreak = function (arg) {
-        const onStart = arg && typeof arg.onStart === 'function' ? arg.onStart : null;
-        if (onStart) ads.on('pause', function once() {
-          ads.off('pause', once);
+        const onStart = typeof arg === 'function' ? arg : arg && typeof arg.onStart === 'function' ? arg.onStart : null;
+        if (onStart) ads.on('pause', function started() {
+          ads.off('pause', started);
           onStart();
         });
         return ads.showRewardedAd({ placement: 'poki-rewarded', rewardLabel: GENERIC_REWARD }).then((r) => r.rewardGranted);
@@ -46,39 +59,43 @@ const adapters = {
   },
 
   // CrazyGames SDK v2/v3: SDK.ad.requestAd('rewarded', { adStarted, adFinished, adError }).
+  // The SDK object and its ad module may each be assigned after the global.
   crazygames(win, ads) {
-    whenDefined(win, 'CrazyGames', (cg) => {
-      const ad = cg && cg.SDK && cg.SDK.ad;
-      if (!ad || ad.__gmsAds) return;
-      ad.__gmsAds = 1;
-      const original = ad.requestAd && ad.requestAd.bind(ad);
-      ad.requestAd = function (type, callbacks) {
-        if (type !== 'rewarded') return original ? original(type, callbacks) : undefined;
-        const cb = callbacks || {};
-        let started = false;
-        const onPause = () => {
-          started = true;
-          if (cb.adStarted) cb.adStarted();
-        };
-        ads.on('pause', onPause);
-        return ads.showRewardedAd({ placement: 'crazygames-rewarded', rewardLabel: GENERIC_REWARD }).then((r) => {
-          ads.off('pause', onPause);
-          if (r.rewardGranted) {
-            if (!started && cb.adStarted) cb.adStarted();
-            if (cb.adFinished) cb.adFinished();
-          } else if (cb.adError) cb.adError({ code: r.status === 'no_fill' ? 'unfilled' : 'other', message: r.status });
-        });
-      };
-    });
+    whenDefined(win, 'CrazyGames', (cg) =>
+      whenDefined(cg, 'SDK', (sdk) =>
+        whenDefined(sdk, 'ad', (ad) => {
+          if (!once(ad)) return;
+          const original = typeof ad.requestAd === 'function' ? ad.requestAd.bind(ad) : null;
+          ad.requestAd = function (type, callbacks) {
+            if (type !== 'rewarded') return original ? original(type, callbacks) : undefined;
+            const cb = callbacks || {};
+            let started = false;
+            const onPause = () => {
+              started = true;
+              if (cb.adStarted) cb.adStarted();
+            };
+            ads.on('pause', onPause);
+            return ads.showRewardedAd({ placement: 'crazygames-rewarded', rewardLabel: GENERIC_REWARD }).then((r) => {
+              ads.off('pause', onPause);
+              if (r.rewardGranted) {
+                if (!started && cb.adStarted) cb.adStarted();
+                if (cb.adFinished) cb.adFinished();
+              } else if (cb.adError) cb.adError({ code: r.status === 'no_fill' ? 'unfilled' : 'other', message: r.status });
+            });
+          };
+        })
+      )
+    );
   },
 
   // GameDistribution: gdsdk.showAd('rewarded') plus SDK_REWARDED_WATCH_COMPLETE
-  // through GD_OPTIONS.onEvent.
+  // through GD_OPTIONS.onEvent. Games offer the reward only once
+  // preloadAd('rewarded') resolves, so that answers from GMSAds too.
   gamedistribution(win, ads) {
     whenDefined(win, 'gdsdk', (gd) => {
-      if (gd.__gmsAds) return;
-      gd.__gmsAds = 1;
-      const original = gd.showAd && gd.showAd.bind(gd);
+      if (!once(gd)) return;
+      const original = typeof gd.showAd === 'function' ? gd.showAd.bind(gd) : null;
+      const preload = typeof gd.preloadAd === 'function' ? gd.preloadAd.bind(gd) : null;
       gd.showAd = function (type) {
         if (type !== 'rewarded') return original ? original(type) : Promise.resolve();
         return ads.showRewardedAd({ placement: 'gd-rewarded', rewardLabel: GENERIC_REWARD }).then((r) => {
@@ -88,6 +105,97 @@ const adapters = {
             return true;
           }
           throw new Error(r.status);
+        });
+      };
+      gd.preloadAd = function (type) {
+        if (type !== 'rewarded') return preload ? preload(type) : Promise.resolve();
+        return ads.isRewardedAdAvailable({ placement: 'gd-rewarded' }).then((ok) => {
+          if (!ok) throw new Error('no_fill');
+          return true;
+        });
+      };
+    });
+  },
+
+  // Yandex Games: YaGames.init() -> ysdk, then
+  // ysdk.adv.showRewardedVideo({ callbacks: { onOpen, onRewarded, onClose, onError } }).
+  // onOpen pauses the game and onClose resumes it, so a shown ad always gets
+  // both; onRewarded only comes with a granted reward. Games often keep the
+  // instance as window.ysdk, which may be set before init is wrapped.
+  yandex(win, ads) {
+    const wrapSdk = (ysdk) =>
+      whenDefined(ysdk, 'adv', (adv) => {
+        if (!once(adv)) return;
+        adv.showRewardedVideo = function (options) {
+          const cb = (options && options.callbacks) || {};
+          const call = (name, arg) => {
+            try {
+              if (typeof cb[name] === 'function') cb[name](arg);
+            } catch (_e) {
+              /* a game callback must not break the ad */
+            }
+          };
+          let opened = false;
+          const onPause = () => {
+            opened = true;
+            call('onOpen');
+          };
+          ads.on('pause', onPause);
+          ads.showRewardedAd({ placement: 'yandex-rewarded', rewardLabel: GENERIC_REWARD }).then((r) => {
+            ads.off('pause', onPause);
+            if (r.rewardGranted) {
+              if (!opened) call('onOpen');
+              call('onRewarded');
+              call('onClose', true);
+            } else if (opened) call('onClose', false);
+            else call('onError', new Error(r.status));
+          });
+        };
+      });
+    whenDefined(win, 'YaGames', (ya) => {
+      if (!once(ya) || typeof ya.init !== 'function') return;
+      const init = ya.init.bind(ya);
+      ya.init = function () {
+        const p = init.apply(null, arguments);
+        if (p && typeof p.then === 'function') {
+          p.then(
+            (ysdk) => ysdk && wrapSdk(ysdk),
+            () => {}
+          );
+        }
+        return p;
+      };
+    });
+    whenDefined(win, 'ysdk', wrapSdk);
+  },
+
+  // Famobi: famobi.rewardedAd(callback) calls back (and newer builds also
+  // resolve) with { adDidLoad, adDidShow, rewardGranted }. Famobi's own
+  // integrations grant the reward when an ad did not load or show, so every
+  // outcome without a reward is reported as shown and denied.
+  // famobi.hasRewardedAd() is synchronous: it answers from the last check.
+  famobi(win, ads) {
+    let available = true;
+    const refresh = () =>
+      ads.isRewardedAdAvailable({ placement: 'famobi-rewarded' }).then((ok) => {
+        available = ok;
+      });
+    whenDefined(win, 'famobi', (fa) => {
+      if (!once(fa)) return;
+      refresh();
+      fa.hasRewardedAd = () => available;
+      fa.rewardedAd = function (callback) {
+        return ads.showRewardedAd({ placement: 'famobi-rewarded', rewardLabel: GENERIC_REWARD }).then((r) => {
+          const result = { adDidLoad: true, adDidShow: true, rewardGranted: r.rewardGranted };
+          refresh();
+          if (typeof callback === 'function') {
+            try {
+              callback(result);
+            } catch (_e) {
+              /* a game callback must not break the ad */
+            }
+          }
+          return result;
         });
       };
     });
