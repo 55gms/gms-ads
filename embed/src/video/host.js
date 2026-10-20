@@ -42,7 +42,8 @@ export function createHost(base) {
     }
     ctl.pause();
     ev.push('impression');
-    const result = await playModal({ ad: s.ad, policy: s.policy, reward: rewarded ? { label: o.rewardLabel } : null, clickUrl: s.clickUrl, onEvent: (t, p) => ev.push(t, p) });
+    // A rewarded ad plays as soon as the viewer says yes to it.
+    const result = await playModal({ ad: s.ad, policy: s.policy, reward: rewarded ? { label: o.rewardLabel } : null, clickUrl: s.clickUrl, autostart: rewarded, onEvent: (t, p) => ev.push(t, p) });
     await ev.done();
     if (!rewarded) return Object.assign(plain(result), { provider: 'first_party' });
     if (result === 'completed' || (result === 'skipped' && s.policy.rewardOnSkip)) {

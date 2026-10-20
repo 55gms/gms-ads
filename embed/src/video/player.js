@@ -113,6 +113,7 @@ async function attachSource(video, ad) {
 //   policy:  { skipAfterSeconds (null = no skip), rewardOnSkip }
 //   reward:  { label } for rewarded, else null
 //   clickUrl, mode ('inline' | 'modal'), onEvent(type, position), onClick()
+//   autostart: play at once, as when the viewer just said yes to the ad
 export function createPlayer(host, options) {
   const ad = options.ad;
   const policy = options.policy || {};
@@ -217,7 +218,7 @@ export function createPlayer(host, options) {
     if (target) target.focus();
   }
 
-  async function start() {
+  async function start(auto) {
     if (state !== 'idle') return;
     if (playing && playing !== api) playing.pause();
     playing = api;
@@ -229,6 +230,14 @@ export function createPlayer(host, options) {
       video.preload = 'auto';
       await video.play();
     } catch (err) {
+      // A browser that refuses to play without a fresh click gets the play button.
+      if (auto && err && err.name === 'NotAllowedError' && state === 'loading') {
+        state = 'idle';
+        spin.hidden = true;
+        poster.hidden = false;
+        big.focus();
+        return;
+      }
       fail(err);
     }
   }
@@ -319,7 +328,7 @@ export function createPlayer(host, options) {
     vol.value = String(video.muted ? 0 : video.volume);
   });
 
-  big.addEventListener('click', start);
+  big.addEventListener('click', () => start());
   toggle.addEventListener('click', () => (video.paused ? video.play().catch(fail) : video.pause()));
   muteBtn.addEventListener('click', () => {
     video.muted = !video.muted;
@@ -401,24 +410,39 @@ export function createPlayer(host, options) {
       root.textContent = '';
     },
   };
+  if (options.autostart) start(true);
   return api;
 }
 
 // Full-screen dialog around a player. Traps focus, restores it afterwards,
-// and locks page scroll while open.
+// and locks page scroll while open. Opened with showModal() where it exists,
+// so it sits in the top layer: above any z-index another script on the page
+// uses (some partner scripts lay a click-catching layer at the maximum one),
+// and above a game frame that is in fullscreen.
 export function openModal(build) {
   const previous = document.activeElement;
-  const backdrop = document.createElement('div');
-  backdrop.setAttribute('role', 'dialog');
-  backdrop.setAttribute('aria-modal', 'true');
-  backdrop.setAttribute('aria-label', 'Advertisement');
-  backdrop.style.cssText = 'position:fixed;inset:0;z-index:2147483646;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;padding:16px';
+  const backdrop = document.createElement('dialog');
+  const modal = typeof backdrop.showModal === 'function';
+  const fallback = modal ? null : document.createElement('div');
+  const root = fallback || backdrop;
+  root.setAttribute('role', 'dialog');
+  root.setAttribute('aria-modal', 'true');
+  root.setAttribute('aria-label', 'Advertisement');
+  root.style.cssText =
+    'position:fixed;inset:0;z-index:2147483647;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;padding:16px;' +
+    'margin:0;border:0;width:auto;height:auto;max-width:none;max-height:none;box-sizing:border-box;color:inherit';
   const box = document.createElement('div');
   box.style.cssText = 'width:min(960px,100%);border-radius:10px;overflow:hidden';
-  backdrop.appendChild(box);
+  root.appendChild(box);
   const overflow = document.documentElement.style.overflow;
   document.documentElement.style.overflow = 'hidden';
-  document.body.appendChild(backdrop);
+  document.body.appendChild(root);
+  // Escape is handled below, as a close request the content decides on.
+  const onCancel = (e) => e.preventDefault();
+  if (modal) {
+    backdrop.addEventListener('cancel', onCancel);
+    backdrop.showModal();
+  }
   const content = build(box);
   const onKey = (e) => {
     if (e.key === 'Escape') {
@@ -426,7 +450,7 @@ export function openModal(build) {
       content.requestClose();
     }
     // The player lives in a closed shadow root; keep focus on its frame.
-    if (e.key === 'Tab' && !backdrop.contains(document.activeElement)) {
+    if (e.key === 'Tab' && !root.contains(document.activeElement)) {
       e.preventDefault();
       content.frame.focus();
     }
@@ -436,7 +460,11 @@ export function openModal(build) {
   return function closeModal() {
     document.removeEventListener('keydown', onKey, true);
     document.documentElement.style.overflow = overflow;
-    backdrop.remove();
+    if (modal) {
+      backdrop.removeEventListener('cancel', onCancel);
+      if (backdrop.open) backdrop.close();
+    }
+    root.remove();
     if (previous && previous.focus && document.contains(previous)) previous.focus({ preventScroll: true });
   };
 }

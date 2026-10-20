@@ -1,6 +1,6 @@
 {
   "name": "@55gms/ads-embed",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "private": true,
   "description": "ads.js browser script for 55GMS, served from jsDelivr",
   "type": "module"

@@ -16,7 +16,7 @@ import { installCompat, registerAdapter } from './compat.js';
 (function (win, doc) {
   if (win.GMSAds && win.GMSAds.version) return;
 
-  const VERSION = '1.2.0';
+  const VERSION = '1.2.1';
   const script = doc.currentScript;
   const listeners = {};
   const pending = new Map(); // id -> { resolve, timer }
@@ -113,10 +113,40 @@ import { installCompat, registerAdapter } from './compat.js';
     });
   }
 
+  // Hello to the parent's ads.js, repeated in short attempts within totalMs,
+  // as it loads async and may not be listening yet. Switches to bridge mode
+  // once it answers, also from direct mode when it answered late.
+  async function connect(totalMs) {
+    let r = { error: 'timeout' };
+    for (let waited = 0; r.error === 'timeout' && waited < totalMs; waited += 500) r = await call('init', {}, 500);
+    if (r.error) return false;
+    state.mode = 'bridge';
+    state.enabled = Boolean(r.enabled);
+    // The host's game ID (from its iframe attribute) wins over ours.
+    state.gameId = r.gameId || state.gameId;
+    return true;
+  }
+
+  const inFrame = () => Boolean(win.parent && win.parent !== win);
+
+  // A frame whose parent did not answer in time asks once more when an ad is
+  // wanted, so a slow parent still shows it rather than this frame.
+  async function ready() {
+    await (initPromise || init());
+    if (state.mode !== 'bridge' && inFrame()) await connect(1500);
+  }
+
   // --- Public API ---------------------------------------------------------------
   function init(options) {
     if (initPromise) return initPromise;
     const opts = Object.assign({ endpoint: '/_ads', timeoutMs: 3000, showTimeoutMs: 10 * 60 * 1000 }, options || {});
+    // On this page's origin: fetch() resolves a relative URL against <base>,
+    // which game pages often point at the CDN their files come from.
+    try {
+      opts.endpoint = new URL(opts.endpoint, win.location.href).href;
+    } catch (_e) {
+      /* keep it as given */
+    }
     if (!isSlug(opts.gameId)) opts.gameId = undefined;
     state = { mode: 'none', gameId: opts.gameId, enabled: false, opts, parentOrigin: expectedParentOrigin(opts), host: null };
     win.addEventListener('message', onMessage);
@@ -124,18 +154,7 @@ import { installCompat, registerAdapter } from './compat.js';
     // wrapped as it is assigned. The adapters' calls wait for init themselves.
     if (opts.compat) installCompat(opts.compat, api);
     initPromise = (async () => {
-      if (win.parent && win.parent !== win) {
-        // The parent's ads.js loads async and may not be listening yet, so
-        // the hello is repeated in short attempts within the timeout.
-        let r = { error: 'timeout' };
-        for (let waited = 0; r.error === 'timeout' && waited < opts.timeoutMs; waited += 500) r = await call('init', {}, 500);
-        if (!r.error) {
-          state.mode = 'bridge';
-          state.enabled = Boolean(r.enabled);
-          // The host's game ID (from its iframe attribute) wins over ours.
-          state.gameId = r.gameId || state.gameId;
-        }
-      }
+      if (inFrame()) await connect(opts.timeoutMs);
       if (state.mode === 'none' && opts.direct !== false) {
         try {
           state.host = await loadVideo(opts);
@@ -151,7 +170,7 @@ import { installCompat, registerAdapter } from './compat.js';
   }
 
   async function isRewardedAdAvailable(o) {
-    await (initPromise || init());
+    await ready();
     if (!state.enabled) return false;
     if (state.mode === 'bridge') {
       const r = await call('available', { format: 'video_rewarded', placement: o && isSlug(o.placement) ? o.placement : undefined }, state.opts.timeoutMs * 2);
@@ -169,7 +188,7 @@ import { installCompat, registerAdapter } from './compat.js';
     if (o && typeof o.rewardLabel === 'string') params.rewardLabel = o.rewardLabel.slice(0, 80);
     inFlight = (async () => {
       try {
-        await (initPromise || init());
+        await ready();
         if (!state.enabled) return outcome('unavailable');
         let result;
         if (state.mode === 'bridge') {
