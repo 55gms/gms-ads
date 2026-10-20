@@ -134,7 +134,14 @@ async function validateRows(rows, { start, end, siteKey, now }) {
       if (bad.length < MAX_REPORTED_ERRORS) bad.push({ index, errors: problems });
     }
   });
-  return { bad, badCount, rows: [...merged.values()], discovered: [...discovered].slice(0, MAX_NEW_DOMAINS) };
+  // Sorted so concurrent batches (one per edge instance) lock shared
+  // stats_hourly and domains rows in the same order and cannot deadlock.
+  return {
+    bad,
+    badCount,
+    rows: [...merged.keys()].sort().map((key) => merged.get(key)),
+    discovered: [...discovered].sort().slice(0, MAX_NEW_DOMAINS),
+  };
 }
 
 async function recordRejection(body, siteKey, details) {
