@@ -40,6 +40,31 @@ function whenDefined(obj, name, wrap) {
   }
 }
 
+// Puts wrap(original) at obj[name] and keeps it there: a later assignment
+// replaces the original, not the wrapper. A loader stub's full SDK often
+// copies its methods onto the stub object it replaces (Poki's core does
+// `for (k in sdk) PokiSDK[k] = sdk[k]`), which would otherwise undo a plain
+// assignment.
+function pin(obj, name, wrap) {
+  let current = wrap(obj[name]);
+  try {
+    Object.defineProperty(obj, name, {
+      configurable: true,
+      enumerable: true,
+      get: () => current,
+      set: (v) => {
+        if (v !== current) current = wrap(v);
+      },
+    });
+  } catch (_e) {
+    try {
+      obj[name] = current;
+    } catch (_e2) {
+      /* frozen; left as it was */
+    }
+  }
+}
+
 const adapters = {
   // PokiSDK.rewardedBreak() -> Promise<boolean>. Newer signatures pass
   // { onStart } or a size, older ones a before-break function; either is
@@ -47,14 +72,14 @@ const adapters = {
   poki(win, ads) {
     whenDefined(win, 'PokiSDK', (sdk) => {
       if (!once(sdk)) return;
-      sdk.rewardedBreak = function (arg) {
+      pin(sdk, 'rewardedBreak', () => function (arg) {
         const onStart = typeof arg === 'function' ? arg : arg && typeof arg.onStart === 'function' ? arg.onStart : null;
         if (onStart) ads.on('pause', function started() {
           ads.off('pause', started);
           onStart();
         });
         return ads.showRewardedAd({ placement: 'poki-rewarded', rewardLabel: GENERIC_REWARD }).then((r) => r.rewardGranted);
-      };
+      });
     });
   },
 
@@ -65,9 +90,8 @@ const adapters = {
       whenDefined(cg, 'SDK', (sdk) =>
         whenDefined(sdk, 'ad', (ad) => {
           if (!once(ad)) return;
-          const original = typeof ad.requestAd === 'function' ? ad.requestAd.bind(ad) : null;
-          ad.requestAd = function (type, callbacks) {
-            if (type !== 'rewarded') return original ? original(type, callbacks) : undefined;
+          pin(ad, 'requestAd', (original) => function (type, callbacks) {
+            if (type !== 'rewarded') return typeof original === 'function' ? original.call(ad, type, callbacks) : undefined;
             const cb = callbacks || {};
             let started = false;
             const onPause = () => {
@@ -82,7 +106,7 @@ const adapters = {
                 if (cb.adFinished) cb.adFinished();
               } else if (cb.adError) cb.adError({ code: r.status === 'no_fill' ? 'unfilled' : 'other', message: r.status });
             });
-          };
+          });
         })
       )
     );
@@ -94,10 +118,8 @@ const adapters = {
   gamedistribution(win, ads) {
     whenDefined(win, 'gdsdk', (gd) => {
       if (!once(gd)) return;
-      const original = typeof gd.showAd === 'function' ? gd.showAd.bind(gd) : null;
-      const preload = typeof gd.preloadAd === 'function' ? gd.preloadAd.bind(gd) : null;
-      gd.showAd = function (type) {
-        if (type !== 'rewarded') return original ? original(type) : Promise.resolve();
+      pin(gd, 'showAd', (original) => function (type) {
+        if (type !== 'rewarded') return typeof original === 'function' ? original.call(gd, type) : Promise.resolve();
         return ads.showRewardedAd({ placement: 'gd-rewarded', rewardLabel: GENERIC_REWARD }).then((r) => {
           const onEvent = win.GD_OPTIONS && win.GD_OPTIONS.onEvent;
           if (r.rewardGranted) {
@@ -106,14 +128,14 @@ const adapters = {
           }
           throw new Error(r.status);
         });
-      };
-      gd.preloadAd = function (type) {
-        if (type !== 'rewarded') return preload ? preload(type) : Promise.resolve();
+      });
+      pin(gd, 'preloadAd', (preload) => function (type) {
+        if (type !== 'rewarded') return typeof preload === 'function' ? preload.call(gd, type) : Promise.resolve();
         return ads.isRewardedAdAvailable({ placement: 'gd-rewarded' }).then((ok) => {
           if (!ok) throw new Error('no_fill');
           return true;
         });
-      };
+      });
     });
   },
 
@@ -126,7 +148,7 @@ const adapters = {
     const wrapSdk = (ysdk) =>
       whenDefined(ysdk, 'adv', (adv) => {
         if (!once(adv)) return;
-        adv.showRewardedVideo = function (options) {
+        pin(adv, 'showRewardedVideo', () => function (options) {
           const cb = (options && options.callbacks) || {};
           const call = (name, arg) => {
             try {
@@ -150,7 +172,7 @@ const adapters = {
             } else if (opened) call('onClose', false);
             else call('onError', new Error(r.status));
           });
-        };
+        });
       });
     whenDefined(win, 'YaGames', (ya) => {
       if (!once(ya) || typeof ya.init !== 'function') return;
@@ -183,8 +205,8 @@ const adapters = {
     whenDefined(win, 'famobi', (fa) => {
       if (!once(fa)) return;
       refresh();
-      fa.hasRewardedAd = () => available;
-      fa.rewardedAd = function (callback) {
+      pin(fa, 'hasRewardedAd', () => () => available);
+      pin(fa, 'rewardedAd', () => function (callback) {
         return ads.showRewardedAd({ placement: 'famobi-rewarded', rewardLabel: GENERIC_REWARD }).then((r) => {
           const result = { adDidLoad: true, adDidShow: true, rewardGranted: r.rewardGranted };
           refresh();
@@ -197,7 +219,7 @@ const adapters = {
           }
           return result;
         });
-      };
+      });
     });
   },
 };
