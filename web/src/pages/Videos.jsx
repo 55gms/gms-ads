@@ -419,7 +419,7 @@ function VideoPreview({ video, onClose }) {
   );
 }
 
-function VideoCard({ video, canWrite, onPreview, onEdit, onSync, onArchive, onDelete }) {
+function VideoCard({ video, canWrite, onPreview, onEdit, onSync, onArchive, onUnarchive, onDelete }) {
   const meta = STATUS[video.status] || STATUS.processing;
   const moving = ['uploading', 'uploaded', 'processing'].includes(video.status);
   return (
@@ -462,6 +462,7 @@ function VideoCard({ video, canWrite, onPreview, onEdit, onSync, onArchive, onDe
               { label: 'Edit', onSelect: onEdit },
               video.provider === 'bunny' && video.status !== 'archived' && { label: 'Check status now', onSelect: onSync },
               video.status !== 'archived' && { label: 'Archive', onSelect: onArchive },
+              video.status === 'archived' && { label: 'Unarchive', onSelect: onUnarchive },
               { label: 'Delete', onSelect: onDelete, danger: true },
             ].filter(Boolean)}
           />
@@ -556,6 +557,7 @@ export function Videos() {
               onEdit={() => setEditing(video)}
               onSync={action(() => post(api(`/videos/${video.id}/sync`)), 'Status refreshed')}
               onArchive={action(() => post(api(`/videos/${video.id}/archive`)), 'Archived. It no longer serves.')}
+              onUnarchive={action(() => post(api(`/videos/${video.id}/unarchive`)), video.provider === 'bunny' ? 'Unarchived. It serves again once Bunny reports it ready.' : 'Unarchived. It serves again.')}
               onDelete={() => setDeleting(video)}
             />
           ))}

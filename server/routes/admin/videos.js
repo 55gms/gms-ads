@@ -240,6 +240,31 @@ videosRouter.post(
   })
 );
 
+// Archiving keeps no earlier state, so an unarchived video starts over: a
+// linked file is ready again, and a Bunny video is processing until the next
+// sync (run here, else by the poller) reports what Bunny has.
+videosRouter.post(
+  '/:id/unarchive',
+  asyncHandler(async (req, res) => {
+    const id = idParam(req);
+    const { rows } = await query(
+      `UPDATE video_assets SET status = CASE WHEN provider = 'external' THEN 'ready' ELSE 'processing' END,
+              error = NULL, sync_attempts = 0, last_synced_at = NULL, updated_at = now()
+        WHERE creative_id = $1 AND status = 'archived' RETURNING *`,
+      [id]
+    );
+    if (!rows[0]) {
+      await one(id);
+      throw new HttpError(409, 'not_archived', 'This video is not archived');
+    }
+    await query("UPDATE creatives SET status = 'active' WHERE id = $1", [id]);
+    if (rows[0].provider === 'bunny') await syncAsset(rows[0]);
+    invalidateVideoCache();
+    audit(req, 'video.unarchived', 'creative', id);
+    res.json({ video: await one(id) });
+  })
+);
+
 videosRouter.delete(
   '/:id',
   asyncHandler(async (req, res) => {
