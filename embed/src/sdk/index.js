@@ -16,7 +16,7 @@ import { installCompat, registerAdapter } from './compat.js';
 (function (win, doc) {
   if (win.GMSAds && win.GMSAds.version) return;
 
-  const VERSION = '1.1.0';
+  const VERSION = '1.2.0';
   const script = doc.currentScript;
   const listeners = {};
   const pending = new Map(); // id -> { resolve, timer }
@@ -120,6 +120,9 @@ import { installCompat, registerAdapter } from './compat.js';
     if (!isSlug(opts.gameId)) opts.gameId = undefined;
     state = { mode: 'none', gameId: opts.gameId, enabled: false, opts, parentOrigin: expectedParentOrigin(opts), host: null };
     win.addEventListener('message', onMessage);
+    // Before the handshake, so a stand-in the game defines meanwhile is
+    // wrapped as it is assigned. The adapters' calls wait for init themselves.
+    if (opts.compat) installCompat(opts.compat, api);
     initPromise = (async () => {
       if (win.parent && win.parent !== win) {
         // The parent's ads.js loads async and may not be listening yet, so
@@ -142,7 +145,6 @@ import { installCompat, registerAdapter } from './compat.js';
           state.mode = 'none';
         }
       }
-      if (opts.compat) installCompat(opts.compat, api);
       return { mode: state.mode, enabled: state.enabled, gameId: state.gameId || null, version: VERSION };
     })();
     return initPromise;
